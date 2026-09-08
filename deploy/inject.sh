@@ -2,7 +2,9 @@
 # One-shot data injection on a VPS. Edit the variables, drop your files in ./import, run: bash deploy/inject.sh
 # Works with docker compose (default) or a bare install (set CLI="node server/cli.js").
 set -euo pipefail
-CLI=${CLI:-"docker compose exec -T -u node app node --no-warnings cli.js"}
+# Set DOCKER="sudo docker" if your user is not in the docker group.
+DOCKER=${DOCKER:-docker}
+CLI=${CLI:-"$DOCKER compose exec -T -u node app node --no-warnings cli.js"}
 IMPORT=${IMPORT:-/import}                 # path as seen by the CLI (container: /import, bare: ./import)
 
 OWNER_EMAIL="you@university.edu"
