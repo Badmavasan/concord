@@ -23,18 +23,23 @@ export default function MembersTab({ campaign, members, owner, reload }) {
   const resend = i => handle(api(`${base}/invites/${i.id}/resend`, { method: 'POST' }));
   const remove = async m => { if (!confirm(`Remove ${m.name}? Their assignments are cleared; submitted answers are kept.`)) return; await api(`${base}/members/${m.id}`, { method: 'DELETE' }); reload(); };
   const revoke = async i => { await api(`${base}/invites/${i.id}`, { method: 'DELETE' }); loadInvites(); };
+  const transfer = async m => {
+    if (!confirm(`Make ${m.name} the owner of "${campaign.name}"?\n\nThey will control criteria, papers, assignments and statistics. You stay on the team as an annotator and cannot undo this yourself.`)) return;
+    try { await api(`${base}/transfer`, { method: 'POST', body: { user_id: m.id } }); window.location.assign(`${base.replace('/campaigns', '/campaigns')}/members`); } catch (e) { setErr(e.message); }
+  };
   const copy = async t => { try { await navigator.clipboard.writeText(t); setCopied(true); } catch {} };
 
   return (
     <div className="stack" style={{ gap: 18, maxWidth: 820 }}>
-      <div className="content-head"><div><h2>Team</h2><p className="hint">Everyone here can be assigned papers. Only the owner edits criteria, papers and stages.</p></div></div>
+      <div className="content-head"><div><h2>Team</h2><p className="hint">Everyone here can be assigned papers. Only the owner edits criteria, papers and stages.{owner && ' Use "Make owner" to hand the campaign to someone else.'}</p></div></div>
+      {err && !result && <div className="note red">{err}</div>}
       <div className="table-wrap"><table>
         <thead><tr><th>Person</th><th>Email</th><th>Role</th>{owner && <th></th>}</tr></thead>
         <tbody>{members.map(m => (
           <tr key={m.id}>
             <td><span className="person"><Avatar name={m.name} /> {m.name}</span></td><td className="muted">{m.email}</td>
             <td><span className={'tag' + (m.role === 'owner' ? ' ink' : '')}>{m.role === 'owner' ? 'Owner' : 'Annotator'}</span></td>
-            {owner && <td style={{ textAlign: 'right' }}>{m.role !== 'owner' && <button className="btn quiet sm danger" onClick={() => remove(m)}>Remove</button>}</td>}
+            {owner && <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{m.role !== 'owner' && <><button className="btn quiet sm" onClick={() => transfer(m)}>Make owner</button> <button className="btn quiet sm danger" onClick={() => remove(m)}>Remove</button></>}</td>}
           </tr>
         ))}</tbody>
       </table></div>

@@ -221,3 +221,8 @@ tr.section td { background: var(--surface-2); font-weight: 600; font-family: var
 
 /* the reader owns its own scrolling; keep the document itself fixed */
 body:has(.reader) { overflow: hidden; }
+
+/* drag-and-drop import */
+.dropzone { position: relative; min-height: 60vh; }
+.dropzone.over { outline: 2px dashed var(--mark); outline-offset: -2px; border-radius: var(--r-lg); }
+.drop-overlay { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; background: rgba(251,245,196,.85); border-radius: var(--r-lg); font-family: var(--serif); font-size: 22px; color: var(--ink); pointer-events: none; }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api.js';
 import Modal from '../../components/Modal.jsx';
@@ -11,6 +11,8 @@ export default function PapersTab({ campaign, members, owner, fields }) {
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [filter, setFilter] = useState('all');
+  const [drop, setDrop] = useState(null); // null | 'over' | { busy } | { report }
+  const dragDepth = useRef(0);
   const base = `/campaigns/${campaign.id}/papers`;
   const load = () => api(base).then(d => setPapers(d.papers));
   useEffect(() => { load(); }, [campaign.id]);
@@ -22,12 +24,41 @@ export default function PapersTab({ campaign, members, owner, fields }) {
   const remove = async p => { if (!confirm(`Delete "${p.title}" and every annotation on it?`)) return; await api(`${base}/${p.id}`, { method: 'DELETE' }); load(); };
   const filters = [['all', 'All'], ['mine', 'Mine'], ...(owner ? [['unassigned', 'Unassigned'], ['nopdf', 'Missing PDF']] : [])];
 
+  // Drag-and-drop: .bib files are imported, PDFs are attached to the paper whose citation key or title matches the filename.
+  const onDragEnter = e => { if (!owner) return; e.preventDefault(); if (++dragDepth.current === 1) setDrop('over'); };
+  const onDragLeave = e => { if (!owner) return; e.preventDefault(); if (--dragDepth.current === 0) setDrop(null); };
+  const onDragOver = e => { if (owner) e.preventDefault(); };
+  const onDrop = async e => {
+    if (!owner) return; e.preventDefault(); dragDepth.current = 0;
+    const files = [...e.dataTransfer.files];
+    const bibs = files.filter(f => /\.bib$/i.test(f.name)), pdfs = files.filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+    if (!bibs.length && !pdfs.length) return setDrop({ report: { errors: ['Drop .bib files or PDFs.'] } });
+    setDrop({ busy: true });
+    const report = { created: 0, skipped: 0, attached: [], unmatched: [], rejected: [], errors: [] };
+    for (const b of bibs) { const fd = new FormData(); fd.append('file', b); try { const d = await api(`${base}/import-bib`, { method: 'POST', form: fd }); report.created += d.created; report.skipped += d.skipped; } catch (err) { report.errors.push(`${b.name}: ${err.message}`); } }
+    if (pdfs.length) { const fd = new FormData(); pdfs.forEach(p => fd.append('pdfs', p)); try { const d = await api(`${base}/attach-pdfs`, { method: 'POST', form: fd }); report.attached = d.attached; report.unmatched = d.unmatched; report.rejected = d.rejected; } catch (err) { report.errors.push(err.message); } }
+    setDrop({ report }); load();
+  };
+
   return (
-    <div className="stack" style={{ gap: 18 }}>
+    <div className={'stack dropzone' + (drop === 'over' ? ' over' : '')} style={{ gap: 18 }} onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={onDragOver} onDrop={onDrop}>
+      {drop === 'over' && <div className="drop-overlay">Drop .bib files to import papers, or PDFs to attach them by citation key or title</div>}
       <div className="content-head">
         <div><h2>Papers</h2><p className="hint">{owner ? 'Add papers by hand or import a BibTeX file. Every paper needs its PDF before anyone can annotate it.' : 'Open a paper to read it and record your answers.'}</p></div>
         {owner && <div className="row"><button className="btn sm" onClick={() => setModal('bib')}>Import BibTeX</button><button className="btn primary sm" onClick={() => setModal('manual')}>Add paper</button></div>}
       </div>
+      {drop?.busy && <div className="note">Importing…</div>}
+      {drop?.report && (
+        <div className={'note' + (drop.report.errors.length ? ' red' : '')}>
+          <div className="row spread"><strong>Drop result</strong><button className="btn quiet sm" onClick={() => setDrop(null)}>Dismiss</button></div>
+          {drop.report.created > 0 && <div>{drop.report.created} paper{drop.report.created === 1 ? '' : 's'} imported{drop.report.skipped ? `, ${drop.report.skipped} duplicate${drop.report.skipped === 1 ? '' : 's'} skipped` : ''}.</div>}
+          {drop.report.attached.length > 0 && <div>{drop.report.attached.length} PDF{drop.report.attached.length === 1 ? '' : 's'} attached: {drop.report.attached.map(a => a.file).join(', ')}</div>}
+          {drop.report.unmatched.length > 0 && <div>No matching paper for: {drop.report.unmatched.join(', ')}. Name PDFs after the citation key, or upload them from the paper's Edit dialog.</div>}
+          {drop.report.rejected.length > 0 && <div>Not a PDF: {drop.report.rejected.join(', ')}</div>}
+          {drop.report.errors.map((e, i) => <div key={i} className="error">{e}</div>)}
+        </div>
+      )}
+      {owner && papers.length === 0 && <div className="note">Tip: drag a .bib file anywhere on this page to import it, then drag the PDFs named after their citation keys.</div>}
       {owner && fields.length === 0 && papers.length > 0 && <div className="note">No criteria defined yet, so annotators have nothing to answer. <Link to="../fields">Add criteria</Link>.</div>}
       <div className="row spread">
         <div className="seg">{filters.map(([k, l]) => <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{l} {counts[k] > 0 && <span style={{ opacity: .6 }}>{counts[k]}</span>}</button>)}</div>
@@ -48,6 +79,7 @@ export default function PapersTab({ campaign, members, owner, fields }) {
                 <Link className="title" to={`${p.id}`}>{p.title}</Link>
                 <div className="sub">{cite(p)}{p.bib_key ? <> <code>{p.bib_key}</code></> : null}</div>
                 {!p.has_pdf && <div style={{ marginTop: 6 }}>{owner ? <button className="btn sm danger" onClick={() => setModal({ pdf: p })}>Upload the PDF</button> : <span className="tag danger">PDF missing</span>}</div>}
+                {p.has_pdf && owner && <div className="muted small" style={{ marginTop: 4 }}>{p.pdf_name}</div>}
               </td>
               <td><span className="row"><Assignees paper={p} />{owner && <button className="btn quiet sm" onClick={() => setModal({ assign: p })}>{p.assignees.length ? 'Change' : 'Assign'}</button>}</span></td>
               <td>
@@ -56,7 +88,7 @@ export default function PapersTab({ campaign, members, owner, fields }) {
               </td>
               <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                 <Link className={'btn sm' + (p.assigned_to_me && p.my_status !== 'submitted' ? ' primary' : '')} to={`${p.id}`}>{p.assigned_to_me && p.my_status !== 'submitted' ? 'Annotate' : 'Open'}</Link>
-                {owner && <button className="btn quiet sm danger" style={{ marginLeft: 4 }} onClick={() => remove(p)} aria-label="Delete">Delete</button>}
+                {owner && <> <button className="btn quiet sm" onClick={() => setModal({ edit: p })}>Edit</button><button className="btn quiet sm danger" onClick={() => remove(p)} aria-label="Delete">Delete</button></>}
               </td>
             </tr>
           ))}</tbody>
@@ -65,6 +97,7 @@ export default function PapersTab({ campaign, members, owner, fields }) {
       {modal === 'manual' && <ManualPaperModal base={base} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
       {modal === 'bib' && <BibImportModal base={base} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
       {modal?.pdf && <PdfUploadModal base={base} paper={modal.pdf} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
+      {modal?.edit && <EditPaperModal base={base} paper={modal.edit} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
       {modal?.assign && <AssignModal base={base} members={members} papers={[modal.assign]} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
       {modal?.bulk && <AssignModal base={base} members={members} papers={papers.filter(p => modal.bulk.includes(p.id))} bulk onClose={() => setModal(null)} onDone={() => { setModal(null); setSelected(new Set()); load(); }} />}
     </div>
@@ -112,6 +145,34 @@ function BibImportModal({ base, onClose, onDone }) {
         <textarea rows={8} value={text} onChange={e => setText(e.target.value)} placeholder={'@article{smith2020,\n  title = {…},\n  author = {…},\n  year = {2020}\n}'} disabled={!!file} style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5 }} />
         {err && <div className="error">{err}</div>}
         <div className="actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={!file && !text.trim()}>Import</button></div>
+      </form>
+    </Modal>
+  );
+}
+
+export function EditPaperModal({ base, paper, onClose, onDone }) {
+  const [f, setF] = useState({ title: paper.title || '', authors: paper.authors || '', year: paper.year || '', venue: paper.venue || '', doi: paper.doi || '', abstract: paper.abstract || '' });
+  const [pdf, setPdf] = useState(null); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const set = k => e => setF({ ...f, [k]: e.target.value });
+  const submit = async e => {
+    e.preventDefault(); setErr(''); setBusy(true);
+    try {
+      await api(`${base}/${paper.id}`, { method: 'PATCH', body: f });
+      if (pdf) { const fd = new FormData(); fd.append('pdf', pdf); await api(`${base}/${paper.id}/pdf`, { method: 'POST', form: fd }); }
+      onDone();
+    } catch (e) { setErr(e.message); setBusy(false); }
+  };
+  return (
+    <Modal title="Edit paper" onClose={onClose}>
+      <form className="stack" onSubmit={submit}>
+        <label className="field">Title<input type="text" autoFocus value={f.title} onChange={set('title')} required /></label>
+        <label className="field">Authors<span className="help">Separate with semicolons</span><input type="text" value={f.authors} onChange={set('authors')} /></label>
+        <div className="row"><label className="field" style={{ flex: 1 }}>Year<input type="text" value={f.year} onChange={set('year')} /></label><label className="field" style={{ flex: 2 }}>Venue<input type="text" value={f.venue} onChange={set('venue')} /></label></div>
+        <label className="field">DOI<input type="text" value={f.doi} onChange={set('doi')} /></label>
+        <label className="field">Abstract<textarea value={f.abstract} onChange={set('abstract')} /></label>
+        <label className="field">PDF<span className="help">{paper.has_pdf ? `Currently ${paper.pdf_name || 'attached'}. Choose a file to replace it.` : 'None attached yet. Annotation stays locked until there is one.'}</span><input type="file" accept="application/pdf" onChange={e => setPdf(e.target.files[0])} /></label>
+        {err && <div className="error">{err}</div>}
+        <div className="actions"><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy}>{busy ? 'Saving' : 'Save changes'}</button></div>
       </form>
     </Modal>
   );

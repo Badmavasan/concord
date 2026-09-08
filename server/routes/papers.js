@@ -161,6 +161,24 @@ r.post('/bulk-assign', requireMember, requireOwner, (req, res) => {
   res.json({ ok: true });
 });
 
+// Bulk PDF attach: files named <bibkey>.pdf, else a filename containing the paper title. Unmatched files are discarded.
+const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+r.post('/attach-pdfs', requireMember, requireOwner, uploadPdf.array('pdfs', 200), (req, res) => {
+  const papers = q.all('SELECT id, title, bib_key, pdf_path FROM papers WHERE campaign_id = ?', req.campaign.id);
+  const attached = [], unmatched = [], rejected = [];
+  for (const f of req.files || []) {
+    const bad = verifyPdf(f); if (bad) { rejected.push(f.originalname); continue; }
+    const base = f.originalname.replace(/\.pdf$/i, '');
+    let p = papers.find(x => x.bib_key && x.bib_key.toLowerCase() === base.toLowerCase());
+    if (!p) { const s = slug(base); p = papers.find(x => { const t = slug(x.title).slice(0, 40); return t.length > 10 && s.includes(t); }); }
+    if (!p) { unmatched.push(f.originalname); fs.rmSync(f.path, { force: true }); continue; }
+    if (p.pdf_path) fs.rmSync(path.join(UPLOAD_DIR, p.pdf_path), { force: true });
+    q.run('UPDATE papers SET pdf_path = ?, pdf_name = ? WHERE id = ?', f.filename, safeName(f.originalname), p.id);
+    p.pdf_path = f.filename; attached.push({ file: f.originalname, paper_id: p.id, title: p.title });
+  }
+  res.json({ attached, unmatched, rejected });
+});
+
 // Kanban move: { stage_id, position }
 r.post('/:paperId/move', requireMember, (req, res) => {
   const p = q.get('SELECT * FROM papers WHERE id = ? AND campaign_id = ?', req.params.paperId, req.campaign.id);

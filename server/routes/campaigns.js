@@ -47,6 +47,20 @@ r.patch('/:id', requireMember, requireOwner, (req, res) => {
   res.json({ campaign: q.get('SELECT * FROM campaigns WHERE id = ?', req.campaign.id) });
 });
 
+// Transfer ownership to another member. The previous owner stays on the team as an annotator.
+r.post('/:id/transfer', requireMember, requireOwner, (req, res) => {
+  const uid = Number(req.body.user_id);
+  const target = q.get('SELECT u.id, u.name FROM campaign_members m JOIN users u ON u.id = m.user_id WHERE m.campaign_id = ? AND m.user_id = ?', req.campaign.id, uid);
+  if (!target) return res.status(400).json({ error: 'That person is not a member of this campaign' });
+  if (uid === req.user.id) return res.status(400).json({ error: 'You already own this campaign' });
+  db.prepare('BEGIN').run();
+  q.run('UPDATE campaigns SET owner_id = ? WHERE id = ?', uid, req.campaign.id);
+  q.run("UPDATE campaign_members SET role = 'member' WHERE campaign_id = ? AND user_id = ?", req.campaign.id, req.user.id);
+  q.run("UPDATE campaign_members SET role = 'owner' WHERE campaign_id = ? AND user_id = ?", req.campaign.id, uid);
+  db.prepare('COMMIT').run();
+  res.json({ ok: true, owner: target });
+});
+
 r.delete('/:id', requireMember, requireOwner, (req, res) => {
   q.run('DELETE FROM campaigns WHERE id = ?', req.campaign.id);
   res.json({ ok: true });

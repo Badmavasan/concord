@@ -112,8 +112,8 @@ Notes on how the codebook is mapped:
 
 1. **Register**, then **create a campaign**. The creator is the owner.
 2. **Criteria** (owner): add one at a time or import a spreadsheet. Options can carry a coding rule (`Option :: rule`).
-3. **Papers** (owner): add manually (PDF required) or import BibTeX. Imported papers without a PDF are flagged and locked.
-4. **Team** (owner): invite by email. New people receive a link to choose a password and join; people who already have an account are added at once and told by email. Links work once and expire after 24 hours (`LINK_TTL_HOURS`); the owner can resend or revoke from the Team page. Everyone can use *Forgot your password?* on the sign-in page.
+3. **Papers** (owner): add manually (PDF required), import BibTeX, or drag files onto the Papers page: `.bib` files are imported and PDFs are attached to the paper whose citation key (`<key>.pdf`) or title matches the filename. Papers without a PDF are flagged and locked. Details and the PDF can be edited at any time from the row's Edit button or from the reader.
+4. **Team** (owner): invite by email, and hand the campaign to someone else with *Make owner* (you stay on as an annotator). New people receive a link to choose a password and join; people who already have an account are added at once and told by email. Links work once and expire after 24 hours (`LINK_TTL_HOURS`); the owner can resend or revoke from the Team page. Everyone can use *Forgot your password?* on the sign-in page.
 5. **Assign** one or more annotators per paper, singly or in bulk.
 6. Annotators open a paper: PDF on the left, criteria grouped by section on the right. Save drafts, then submit (required criteria validated).
 7. **Board**: Kanban with default stages *To review → In progress → Reviewed → Conflict → Done*. Papers auto-advance to *In progress* on first draft and to *Reviewed* once all assignees submit.
@@ -134,10 +134,11 @@ All under `/api`, JSON, cookie-based JWT auth.
 
 - `POST /auth/register|login|logout`, `GET /auth/me`, `GET /auth/invite/:token`, `POST /auth/invite/:token/accept`
 - `GET|POST /campaigns`, `GET|PATCH|DELETE /campaigns/:id`
-- `POST /campaigns/:id/invites`, `DELETE /campaigns/:id/members/:userId`
+- `POST /campaigns/:id/invites`, `POST …/invites/:inviteId/resend`, `DELETE /campaigns/:id/members/:userId`, `POST /campaigns/:id/transfer`
 - `POST|PATCH|DELETE /campaigns/:id/stages…`, `PUT /campaigns/:id/stages/order`
 - `POST /campaigns/:id/fields`, `POST /campaigns/:id/fields/import` (xlsx), `GET /campaigns/:id/fields/template.xlsx`
 - `GET|POST /campaigns/:id/papers`, `POST …/papers/import-bib`, `POST …/papers/:pid/pdf`, `GET …/papers/:pid/pdf`
+- `PATCH …/papers/:pid`, `POST …/papers/attach-pdfs` (multipart `pdfs[]`, matched by filename)
 - `PUT …/papers/:pid/assignees`, `POST …/papers/bulk-assign`, `POST …/papers/:pid/move`
 - `PUT …/papers/:pid/annotation` (`{ values, status: 'draft'|'submitted' }`)
 - `GET /campaigns/:id/stats`, `GET /campaigns/:id/stats/export.xlsx`

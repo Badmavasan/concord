@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
-import { PdfUploadModal, AssignModal } from './tabs/PapersTab.jsx';
+import { PdfUploadModal, AssignModal, EditPaperModal } from './tabs/PapersTab.jsx';
 import Avatar, { Assignees } from '../components/Avatar.jsx';
 
 export default function PaperView() {
@@ -55,6 +55,7 @@ export default function PaperView() {
             <div className="row" style={{ marginTop: 12 }}>
               <Assignees paper={paper} />
               {owner && <button className="btn quiet sm" onClick={() => setModal('assign')}>Assign</button>}
+              {owner && <button className="btn quiet sm" onClick={() => setModal('edit')}>Edit</button>}
               {owner && paper.has_pdf && <button className="btn quiet sm" onClick={() => setModal('pdf')}>Replace PDF</button>}
             </div>
           </div>
@@ -90,6 +91,7 @@ export default function PaperView() {
           </div>
         )}
       </aside>
+      {modal === 'edit' && <EditPaperModal base={`${base}/papers`} paper={paper} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
       {modal === 'pdf' && <PdfUploadModal base={`${base}/papers`} paper={paper} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
       {modal === 'assign' && <AssignModal base={`${base}/papers`} members={camp.members} papers={[paper]} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
     </div>
