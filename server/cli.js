@@ -55,7 +55,7 @@ const cmds = {
     console.log(`From:    ${mail.from}`);
     try { await transporter().verify(); console.log('The server accepted the login.'); }
     catch (e) { die(`The server refused the login: ${e.message}\nUsual causes: SMTP_USER is not the full address, the password is wrong, or the port/secure pair does not match (465+true, 587+false).`); }
-    if (to) { const ok = await sendPasswordReset({ to, name: 'there', link: 'https://example.invalid/reset/test-message' }); console.log(ok ? `Sent a test message to ${to}.` : 'Sending failed, see the error above.'); }
+    if (to) { const ok = await sendPasswordReset({ to, name: 'there', link: (process.env.APP_URL || 'http://localhost:4321').replace(/\/$/, '') + '/forgot' }); console.log(ok ? `Sent a test message to ${to}.` : 'Sending failed, see the error above.'); }
   },
   'user add': ([email, name]) => {
     if (!email || !name) die('usage: user add <email> <name> [--password X]');
