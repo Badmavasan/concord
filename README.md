@@ -14,7 +14,7 @@ npm run dev              # API on :4321, Vite dev server on :5173 (proxying /api
 Single process serving the built React app:
 
 ```bash
-npm run build && npm start   # http://localhost:4321
+npm run build && npm start   # http://localhost:4321 (PORT to change)
 ```
 
 Config: see `.env.example` (`JWT_SECRET`, `PORT`, `APP_URL`, `DATA_DIR`, SMTP for emailed invites). Without SMTP, invite links are displayed in the UI to copy and share.
@@ -27,10 +27,12 @@ Config: see `.env.example` (`JWT_SECRET`, `PORT`, `APP_URL`, `DATA_DIR`, SMTP fo
 git clone <repo> concord && cd concord
 cp .env.example .env && nano .env        # set JWT_SECRET and APP_URL at least
 mkdir -p storage import
-docker compose up -d --build             # app on port 4321
+docker compose up -d --build             # app on 127.0.0.1:4700 (HOST_PORT in .env)
 ```
 
-The database and PDFs live in `./storage` (mounted at `/data`). Back that folder up. Put a reverse proxy in front for HTTPS: `deploy/Caddyfile` is a two-line Caddy config with automatic certificates.
+The database and PDFs live in `./storage` (mounted at `/data`). Back that folder up. Put a reverse proxy in front for HTTPS: `deploy/nginx/concord.conf` is a ready nginx site for `concord.badmavasan.tech` (rate limits, 120 MB uploads, proxy to 127.0.0.1:4700); `deploy/Caddyfile` is the Caddy equivalent.
+
+Ports: the container listens on 4321 internally and is published on `HOST_PORT` (default 4700, chosen to avoid 3000, 3001, 3100, 3300, 3301, 4000, 8080, 8090–8092 and 8181 already used on the host). Bare-metal installs read `PORT` instead. Concord needs its own hostname: it has no base-path mode, so it cannot be mounted under `/concord/` on an existing site.
 
 ### Without Docker
 

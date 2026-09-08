@@ -9,6 +9,7 @@ Type=simple
 User=www-data
 WorkingDirectory=/opt/concord/server
 EnvironmentFile=/opt/concord/.env
+Environment=PORT=4700
 ExecStart=/usr/bin/node --no-warnings index.js
 Restart=always
 RestartSec=3

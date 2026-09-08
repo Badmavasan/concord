@@ -3,8 +3,10 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "${BIND:-127.0.0.1}:${PORT:-4321}:4321"   # only the reverse proxy on this host can reach it; set BIND=0.0.0.0 to expose directly
+      - "${BIND:-127.0.0.1}:${HOST_PORT:-4700}:4321"   # loopback only; nginx proxies to it. Set BIND=0.0.0.0 to expose directly.
     env_file: .env
+    environment:
+      PORT: 4321            # port inside the container; HOST_PORT above is what nginx talks to
     volumes:
       - ./storage:/data       # database + PDFs (back this folder up)
       - ./import:/import:ro   # drop .bib / .xlsx / PDFs here for the CLI
