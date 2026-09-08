@@ -28,3 +28,6 @@ import/
 .vscode/
 .idea/
 .DS_Store
+
+# local notes
+memory/
