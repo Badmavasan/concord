@@ -26,7 +26,7 @@ All routes are under `/api`, speak JSON, and use the session cookie set at sign-
 | POST | `/campaigns` | `{ name, description }` |
 | GET | `/campaigns/:id` | member: campaign, members, fields, stages |
 | PATCH | `/campaigns/:id` | owner |
-| DELETE | `/campaigns/:id` | owner |
+| DELETE | `/campaigns/:id` | owner: `{ confirm: <campaign name> }`; removes PDF files too |
 | POST | `/campaigns/:id/transfer` | owner: `{ user_id }` |
 | POST | `/campaigns/:id/invites` | owner: `{ email }` → `{ added, emailed, link?, expires_at }` |
 | GET | `/campaigns/:id/invites` | owner: pending invitations |

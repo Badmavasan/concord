@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { q, db } from '../db.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { q, db, UPLOAD_DIR } from '../db.js';
 import { requireMember, requireOwner } from '../auth.js';
 import { sendInvite, sendAddedToCampaign, mailEnabled, LINK_TTL_MS } from '../mailer.js';
 import { newToken, hashToken, siteUrl } from '../tokens.js';
@@ -61,9 +63,13 @@ r.post('/:id/transfer', requireMember, requireOwner, (req, res) => {
   res.json({ ok: true, owner: target });
 });
 
+// Deleting a campaign removes its papers, annotations, assignments, criteria, stages, invitations and the PDF files.
 r.delete('/:id', requireMember, requireOwner, (req, res) => {
+  if (str(req.body?.confirm, 200) !== req.campaign.name) return res.status(400).json({ error: 'Type the campaign name to confirm deletion' });
+  const files = q.all('SELECT pdf_path FROM papers WHERE campaign_id = ? AND pdf_path IS NOT NULL', req.campaign.id);
   q.run('DELETE FROM campaigns WHERE id = ?', req.campaign.id);
-  res.json({ ok: true });
+  for (const f of files) fs.rmSync(path.join(UPLOAD_DIR, path.basename(f.pdf_path)), { force: true });
+  res.json({ ok: true, removed_files: files.length });
 });
 
 // ---- members & invites ----

@@ -168,3 +168,15 @@ console.log('ALL PASSED');
   await call('b', `/campaigns/${cid}/stats`); ok(true, 'new owner sees stats');
   console.log('EXTRA PASSED');
 }
+
+// ---- campaign deletion (bob owns it now) ----
+{
+  err = await call('a', `/campaigns/${cid}`, { method: 'DELETE', body: { confirm: 'Test SR' } }).catch(e => e.message); ok(/403/.test(err), 'member cannot delete campaign');
+  err = await call('b', `/campaigns/${cid}`, { method: 'DELETE', body: { confirm: 'wrong' } }).catch(e => e.message); ok(/confirm/.test(err), 'deletion requires the campaign name');
+  const before = (await call('b', `/campaigns/${cid}/papers`)).papers.filter(p => p.has_pdf).length;
+  const d = await call('b', `/campaigns/${cid}`, { method: 'DELETE', body: { confirm: 'Test SR' } });
+  ok(d.ok && d.removed_files === before, `campaign deleted with ${d.removed_files} PDF files removed`);
+  err = await call('b', `/campaigns/${cid}`).catch(e => e.message); ok(/404/.test(err), 'campaign gone');
+  ok((await call('b', '/campaigns')).campaigns.every(c => c.id !== cid), 'not listed any more');
+  console.log('DELETE PASSED');
+}

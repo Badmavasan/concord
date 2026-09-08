@@ -5,7 +5,7 @@
 - Any number of campaigns per instance; each user sees the ones they belong to.
 - One owner per campaign, with full control; other members are annotators.
 - Ownership transfer to any member (the former owner stays as an annotator).
-- Campaign name and description editable by the owner; deletion removes everything in it.
+- Settings page for the owner: rename, edit the description, and delete the campaign after typing its name; deletion removes papers, PDFs, criteria, assignments, annotations and invitations.
 
 ## Criteria
 
