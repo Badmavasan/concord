@@ -45,7 +45,7 @@ export default function Login({ register = false, inviteToken, inviteEmail, bare
       {!bare && <h2>{register ? 'Create your account' : 'Welcome back'}</h2>}
       {register && <label className="field">Name<input type="text" value={form.name} onChange={set('name')} required autoComplete="name" /></label>}
       <label className="field">Email<input type="email" value={form.email} onChange={set('email')} required readOnly={!!inviteEmail} autoComplete="email" /></label>
-      <label className="field">Password{register && <span className="help">At least 8 characters</span>}<input type="password" value={form.password} onChange={set('password')} required minLength={8} autoComplete={register ? 'new-password' : 'current-password'} /></label>
+      <label className="field">Password{register && <span className="help">At least 8 characters</span>}<input type="password" value={form.password} onChange={set('password')} required minLength={register ? 8 : undefined} autoComplete={register ? 'new-password' : 'current-password'} /></label>
       {err && <div className="error">{err}</div>}
       <button className="btn primary" disabled={busy} style={{ justifyContent: 'center', padding: 10 }}>{busy ? 'One moment' : register ? 'Create account' : 'Sign in'}</button>
       {!inviteToken && <div className="muted small" style={{ textAlign: 'center' }}>
