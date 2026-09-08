@@ -7,7 +7,8 @@
     "dev": "concurrently -n server,client -c blue,green \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
     "build": "npm --prefix client run build",
     "start": "npm --prefix server start",
-    "cli": "node --no-warnings server/cli.js"
+    "cli": "node --no-warnings server/cli.js",
+    "test": "node tests/run.mjs"
   },
   "devDependencies": { "concurrently": "^9.1.0" }
 }

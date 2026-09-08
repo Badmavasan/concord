@@ -3,7 +3,7 @@
 //   SMTP_HOST      smtp.mail.ovh.net for OVH mailboxes (ssl0.ovh.net also works)
 //   SMTP_PORT      465 (TLS from the first byte) or 587 (STARTTLS)
 //   SMTP_SECURE    true for 465; inferred from the port when unset
-//   SMTP_USER      the full mailbox address, e.g. noreply@badmavasan.tech
+//   SMTP_USER      the full mailbox address, e.g. noreply@example.org
 //   SMTP_PASSWORD  its password (SMTP_PASS is accepted as an alias)
 //   MAIL_FROM      what recipients see; the address must match SMTP_USER on OVH
 //

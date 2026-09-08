@@ -1,5 +1,5 @@
 # Reverse proxy with automatic HTTPS. Replace the domain, then: caddy run --config Caddyfile
-concord.badmavasan.tech {
+concord.example.org {
     reverse_proxy localhost:4700
     request_body {
         max_size 120MB

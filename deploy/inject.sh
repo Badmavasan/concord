@@ -7,7 +7,7 @@ IMPORT=${IMPORT:-/import}                 # path as seen by the CLI (container: 
 
 OWNER_EMAIL="you@university.edu"
 OWNER_NAME="Your Name"
-CAMPAIGN="LLM4ED"
+CAMPAIGN="My review"
 CODEBOOK="$IMPORT/Codebook.xlsx"
 BIB="$IMPORT/papers.bib"
 PDF_DIR="$IMPORT/pdfs"                    # <bibkey>.pdf files
