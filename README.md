@@ -30,7 +30,20 @@ mkdir -p storage import
 docker compose up -d --build             # app on 127.0.0.1:4700 (HOST_PORT in .env)
 ```
 
-The database and PDFs live in `./storage` (mounted at `/data`). Back that folder up. Put a reverse proxy in front for HTTPS: `deploy/nginx/concord.conf` is a ready nginx site for `concord.badmavasan.tech` (rate limits, 120 MB uploads, proxy to 127.0.0.1:4700); `deploy/Caddyfile` is the Caddy equivalent.
+The database and PDFs live in `./storage` (mounted at `/data`). Back that folder up.
+
+nginx in front, with the certificate issued in two steps because the full site file names certificate files that do not exist yet:
+
+```bash
+sudo cp deploy/nginx/concord-bootstrap.conf /etc/nginx/sites-available/concord   # HTTP only
+sudo ln -sf /etc/nginx/sites-available/concord /etc/nginx/sites-enabled/concord
+sudo mkdir -p /var/www/certbot && sudo nginx -t && sudo systemctl reload nginx
+sudo certbot certonly --webroot -w /var/www/certbot -d concord.badmavasan.tech
+sudo cp deploy/nginx/concord.conf /etc/nginx/sites-available/concord             # full HTTPS site
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+`deploy/nginx/concord.conf` proxies to 127.0.0.1:4700 with rate limits and 120 MB uploads; `deploy/Caddyfile` is the Caddy equivalent.
 
 Ports: the container listens on 4321 internally and is published on `HOST_PORT` (default 4700, chosen to avoid 3000, 3001, 3100, 3300, 3301, 4000, 8080, 8090–8092 and 8181 already used on the host). Bare-metal installs read `PORT` instead. Concord needs its own hostname: it has no base-path mode, so it cannot be mounted under `/concord/` on an existing site.
 
