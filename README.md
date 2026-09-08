@@ -61,7 +61,7 @@ systemctl daemon-reload && systemctl enable --now concord
 Everything the UI does for setup can be done with `server/cli.js`, which talks to the database directly (no login needed). Drop your files in `./import` (mounted read-only at `/import` inside the container).
 
 ```bash
-# Docker:   docker compose exec app node --no-warnings cli.js <command>
+# Docker:   docker compose exec -u node app node --no-warnings cli.js <command>
 # Bare:     npm run cli -- <command>
 
 cli.js user add you@univ.edu "Your Name" --password secret     # password is generated if omitted
@@ -90,7 +90,7 @@ Two layouts are accepted by the Import button and by `fields import`:
 The LLM4ED codebook lives at `data/Codebook.xlsx` (French, groups A–H, ~60 criteria, one row per option with an English coding rule). It and all other review material (`data/`, `import/`, `.bib`, `.pdf`, `.xlsx`, the database and uploads) are git-ignored, so they stay on your machine and server. To set the campaign up on a fresh server:
 
 ```bash
-CLI="docker compose exec app node --no-warnings cli.js"     # or: CLI="npm run cli --"
+CLI="docker compose exec -u node app node --no-warnings cli.js"     # or: CLI="npm run cli --"
 $CLI user add you@univ.edu "Your Name" --password '…'
 $CLI campaign create "LLM4ED" --owner you@univ.edu --description "LLM use in education: architecture, delegated tasks, evaluation rigour, AI Act risk, trustworthy AI"
 $CLI fields import LLM4ED /import/Codebook.xlsx               # 60 criteria, grouped A–H, with coding rules
