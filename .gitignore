@@ -1,0 +1,30 @@
+# dependencies & builds
+node_modules/
+client/dist/
+
+# runtime data (database, uploaded PDFs) – never commit
+server/uploads/
+server/data.sqlite*
+storage/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# LLM4ED review material: codebook, bibliographies, PDFs, exports
+data/
+import/
+*.bib
+*.pdf
+*.xlsx
+*.csv
+!client/**/*.xlsx
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store

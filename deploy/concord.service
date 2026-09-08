@@ -1,0 +1,17 @@
+# Bare-metal alternative to Docker. Copy to /etc/systemd/system/, adjust paths, then:
+#   systemctl daemon-reload && systemctl enable --now concord
+[Unit]
+Description=Concord (systematic review platform)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/concord/server
+EnvironmentFile=/opt/concord/.env
+ExecStart=/usr/bin/node --no-warnings index.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

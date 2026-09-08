@@ -1,0 +1,7 @@
+# Reverse proxy with automatic HTTPS. Replace the domain, then: caddy run --config Caddyfile
+review.example.org {
+    reverse_proxy localhost:4321
+    request_body {
+        max_size 120MB
+    }
+}
