@@ -62,7 +62,7 @@ async function issueInvite(req, res, email) {
     q.run('INSERT OR IGNORE INTO campaign_members (campaign_id, user_id, role) VALUES (?, ?, ?)', req.campaign.id, user.id, 'member');
     q.run("UPDATE invites SET accepted_at = datetime('now') WHERE campaign_id = ? AND email = ? AND accepted_at IS NULL", req.campaign.id, email);
     const link = `${base}/campaigns/${req.campaign.id}`;
-    const emailed = await sendAddedToCampaign({ to: email, name: user.name, inviterName: req.user.name, campaignName: req.campaign.name, link });
+    const emailed = await sendAddedToCampaign({ to: email, name: user.name, inviterName: req.user.name, inviterEmail: req.user.email, campaignName: req.campaign.name, link });
     return res.json({ added: true, emailed, mailEnabled, email });
   }
   const token = newToken();
@@ -71,7 +71,7 @@ async function issueInvite(req, res, email) {
   if (existing) q.run("UPDATE invites SET token = ?, expires_at = ?, sent_at = datetime('now'), invited_by = ? WHERE id = ?", hashToken(token), expires, req.user.id, existing.id);
   else q.run("INSERT INTO invites (campaign_id, email, token, expires_at, sent_at, invited_by) VALUES (?, ?, ?, ?, datetime('now'), ?)", req.campaign.id, email, hashToken(token), expires, req.user.id);
   const link = `${base}/invite/${token}`;
-  const emailed = await sendInvite({ to: email, inviterName: req.user.name, campaignName: req.campaign.name, link });
+  const emailed = await sendInvite({ to: email, inviterName: req.user.name, inviterEmail: req.user.email, campaignName: req.campaign.name, link });
   // The link is only handed back when it could not be emailed: the owner then passes it on by hand.
   res.json({ added: false, emailed, mailEnabled, email, link: emailed ? undefined : link, expires_at: expires });
 }

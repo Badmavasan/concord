@@ -164,6 +164,8 @@ docker compose exec -u node app node cli.js mail test                 # log in a
 docker compose exec -u node app node cli.js mail test you@univ.edu    # send a test message
 ```
 
+Deliverability: mail from a fresh domain lands in spam until the domain is authenticated. In the OVH control panel (Web Cloud, Emails, the domain, DKIM tab) enable DKIM; OVH then adds the `ovhmo*._domainkey` CNAME records itself when the DNS zone is at OVH. Add a DMARC record in the DNS zone: `_dmarc` TXT `v=DMARC1; p=quarantine; rua=mailto:you@badmavasan.tech`. Keep SPF as `v=spf1 include:mx.ovh.com ~all`. Check with `dig TXT _dmarc.badmavasan.tech` and by sending a test to a Gmail address and opening "Show original": SPF, DKIM and DMARC should all read PASS.
+
 Three messages are sent, all in Concord's own look: an invitation with a choose-a-password link, a "you were added" notice for people who already have an account, and a password reset. Tokens are stored hashed, work once, and expire after `LINK_TTL_HOURS`. Changing a password signs out every other session of that account.
 
 ## Security notes

@@ -46,18 +46,18 @@ function layout({ heading, paragraphs, cta, footnote }) {
 </div>`;
 }
 
-async function deliver({ to, subject, heading, paragraphs, cta, footnote, textLines }) {
+async function deliver({ to, subject, heading, paragraphs, cta, footnote, textLines, replyTo }) {
   const text = textLines.join('\n');
   if (!mailEnabled) { console.warn(`[mail] Not configured, so nothing was sent to ${to}. ${cta ? 'Link: ' + cta.href : ''}`); return false; }
   try {
-    await transporter().sendMail({ from: mail.from, to, subject, text, html: layout({ heading, paragraphs, cta, footnote }) });
+    await transporter().sendMail({ from: mail.from, to, subject, text, html: layout({ heading, paragraphs, cta, footnote }), replyTo: replyTo || process.env.MAIL_REPLY_TO || undefined });
     return true;
   } catch (err) { console.error('[mail] Could not send:', err.message); return false; }
 }
 
-export function sendInvite({ to, inviterName, campaignName, link }) {
+export function sendInvite({ to, inviterName, inviterEmail, campaignName, link }) {
   return deliver({
-    to, subject: `${inviterName} invited you to review "${campaignName}"`,
+    to, replyTo: inviterEmail, subject: `${inviterName} invited you to review "${campaignName}"`,
     heading: `${esc(inviterName)} invited you to <mark style="background:#f3e14b;padding:0 .1em">${esc(campaignName)}</mark>`,
     paragraphs: [`You have been asked to annotate papers for the systematic review <strong>${esc(campaignName)}</strong> on Concord.`, `Open the link below to choose a password. It works once and stops working after ${ttlText()}; if it has expired, ask ${esc(inviterName)} to send a new one.`],
     cta: { href: link, label: 'Choose a password and join' },
@@ -66,9 +66,9 @@ export function sendInvite({ to, inviterName, campaignName, link }) {
   });
 }
 
-export function sendAddedToCampaign({ to, name, inviterName, campaignName, link }) {
+export function sendAddedToCampaign({ to, name, inviterName, inviterEmail, campaignName, link }) {
   return deliver({
-    to, subject: `You were added to "${campaignName}"`,
+    to, replyTo: inviterEmail, subject: `You were added to "${campaignName}"`,
     heading: `You are now on <mark style="background:#f3e14b;padding:0 .1em">${esc(campaignName)}</mark>`,
     paragraphs: [`Hello ${esc(name)},`, `${esc(inviterName)} added you to the systematic review <strong>${esc(campaignName)}</strong>. Sign in with your usual password to see the papers assigned to you.`],
     cta: { href: link, label: 'Open the campaign' },
