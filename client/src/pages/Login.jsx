@@ -43,6 +43,7 @@ export default function Login({ register = false, inviteEmail, bare, afterLogin 
   const form_ = (
     <form className="stack" onSubmit={submit}>
       {!bare && <h2>{register ? 'Create your account' : 'Welcome back'}</h2>}
+      {register && !openReg && <div className="note">Sign-up is by invitation on this instance. Ask a campaign owner to invite you, or sign in if you already have an account.</div>}
       {register && <label className="field">Name<input type="text" value={form.name} onChange={set('name')} required autoComplete="name" /></label>}
       <label className="field">Email<input type="email" value={form.email} onChange={set('email')} required readOnly={!!inviteEmail} autoComplete="email" /></label>
       <label className="field">Password{register && <span className="help">At least 8 characters</span>}<input type="password" value={form.password} onChange={set('password')} required minLength={register ? 8 : undefined} autoComplete={register ? 'new-password' : 'current-password'} /></label>
@@ -51,7 +52,7 @@ export default function Login({ register = false, inviteEmail, bare, afterLogin 
       {!bare && <div className="muted small" style={{ textAlign: 'center' }}>
         {register ? <>Already have an account? <Link to="/login">Sign in</Link></> : <>
           <Link to="/forgot">Forgot your password?</Link>
-          <div style={{ marginTop: 6 }}>{openReg ? <>New here? <Link to="/register">Create an account</Link></> : <>Accounts are created through invitation links from a campaign owner.</>}</div>
+          <div style={{ marginTop: 6 }}>{openReg ? <>New here? <Link to="/register">Create an account</Link></> : <>Sign-up is by invitation on this instance: ask a campaign owner to invite you.</>}</div>
         </>}
       </div>}
     </form>
