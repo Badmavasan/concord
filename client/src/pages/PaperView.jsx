@@ -1,4 +1,7 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+
+const MIN_W = 320, DEFAULT_W = 440;
+const readWidth = () => { try { const v = Number(localStorage.getItem('concord.readerWidth')); return v >= MIN_W ? v : DEFAULT_W; } catch { return DEFAULT_W; } };
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
@@ -17,6 +20,19 @@ export default function PaperView() {
   const [showOthers, setShowOthers] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [guide, setGuide] = useState(true);
+  const [width, setWidth] = useState(readWidth);
+  const [dragging, setDragging] = useState(false);
+  const readerRef = useRef(null);
+
+  // Divider drag: the pointer is captured on the handle so the iframe never swallows the move events.
+  const startDrag = e => {
+    e.preventDefault(); setDragging(true); e.currentTarget.setPointerCapture(e.pointerId);
+    const onMove = ev => { const rect = readerRef.current.getBoundingClientRect(); const w = Math.round(rect.right - ev.clientX); setWidth(Math.min(Math.max(w, MIN_W), Math.round(rect.width * 0.75))); };
+    const onUp = () => { setDragging(false); window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); setWidth(w => { try { localStorage.setItem('concord.readerWidth', String(w)); } catch {} return w; }); };
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
+  };
+  const nudge = e => { const d = e.key === 'ArrowLeft' ? 24 : e.key === 'ArrowRight' ? -24 : 0; if (!d) return; e.preventDefault(); setWidth(w => { const n = Math.max(MIN_W, w + d); try { localStorage.setItem('concord.readerWidth', String(n)); } catch {} return n; }); };
+  const resetWidth = () => { setWidth(DEFAULT_W); try { localStorage.removeItem('concord.readerWidth'); } catch {} };
   const base = `/campaigns/${id}`;
   const load = () => Promise.all([api(base), api(`${base}/papers/${paperId}`)]).then(([c, p]) => { setCamp(c); setData(p); setValues(p.my_annotation?.values || {}); setDirty(false); });
   useEffect(() => { load(); }, [id, paperId]);
@@ -39,12 +55,13 @@ export default function PaperView() {
   const setVal = (fid, v) => { setValues(vs => ({ ...vs, [fid]: v })); setDirty(true); };
 
   return (
-    <div className="reader">
+    <div className={'reader' + (dragging ? ' dragging' : '')} ref={readerRef} style={{ '--margin-w': width + 'px' }}>
       <div className="pdf-pane">
         {paper.has_pdf ? <iframe title="Paper PDF" src={`/api${base}/papers/${paperId}/pdf`} /> : (
           <div className="pdf-empty"><div>This paper has no PDF yet.</div>{owner && <button className="btn mark" onClick={() => setModal('pdf')}>Upload the PDF</button>}</div>
         )}
       </div>
+      <div className="divider" role="separator" aria-orientation="vertical" aria-label="Resize the annotation panel (drag, arrow keys, double-click to reset)" tabIndex={0} onPointerDown={startDrag} onKeyDown={nudge} onDoubleClick={resetWidth}><span /></div>
       <aside className="margin">
         <div className="margin-scroll">
           <div className="margin-head">

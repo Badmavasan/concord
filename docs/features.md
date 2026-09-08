@@ -36,7 +36,7 @@
 ## Assignment and annotation
 
 - One or several annotators per paper; single-row or bulk assignment with add or replace modes.
-- Reader with the PDF pinned beside a scrolling form; drafts and submissions; validation of required fields and option values.
+- Reader with the PDF pinned beside a scrolling form; a draggable divider sets how much room the form gets (arrow keys on the handle, double-click to reset) and the choice is remembered per browser; drafts and submissions; validation of required fields and option values.
 - Owner view of all annotators' answers on a paper.
 - Annotation locked while a paper has no PDF.
 

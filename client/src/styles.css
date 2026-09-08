@@ -147,11 +147,17 @@ tr.selected td { background: var(--mark-soft); }
 .kcard .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 
 /* ---------- reading / annotation ---------- */
-.reader { display: grid; grid-template-columns: minmax(0, 1fr) 440px; height: calc(100vh - 56px); overflow: hidden; }
+.reader { display: grid; grid-template-columns: minmax(0, 1fr) 10px var(--margin-w, 440px); height: calc(100vh - 56px); overflow: hidden; }
+.reader.dragging { cursor: col-resize; user-select: none; }
+.reader.dragging iframe { pointer-events: none; }
+.divider { background: var(--surface-2); border-left: 1px solid var(--rule); border-right: 1px solid var(--rule); cursor: col-resize; display: flex; align-items: center; justify-content: center; touch-action: none; }
+.divider span { width: 2px; height: 36px; border-radius: 2px; background: var(--rule-strong); }
+.divider:hover, .reader.dragging .divider { background: var(--mark-soft); } .divider:hover span, .reader.dragging .divider span { background: var(--ink); }
+.divider:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .pdf-pane { background: #3b413e; position: sticky; top: 56px; height: calc(100vh - 56px); overflow: hidden; }
 .pdf-pane iframe { width: 100%; height: 100%; border: 0; display: block; }
 .pdf-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #dfe4e0; }
-.margin { border-left: 1px solid var(--rule); background: var(--surface); display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
+.margin { background: var(--surface); display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
 .margin-scroll { overflow-y: auto; padding: 22px 26px 24px; flex: 1; min-height: 0; overscroll-behavior: contain; }
 .margin-head h2 { font-family: var(--serif); font-weight: 500; font-size: 21px; line-height: 1.2; margin: 8px 0 4px; }
 .margin-head .meta { color: var(--muted); font-size: 13px; }
@@ -175,7 +181,7 @@ tr.selected td { background: var(--mark-soft); }
 .scale input { display: none; }
 .scale label:has(input:checked) { background: var(--mark); border-color: var(--mark); }
 .state { font-size: 13px; color: var(--muted); }
-@media (max-width: 900px) { .reader { grid-template-columns: 1fr; height: auto; overflow: visible; } .pdf-pane { position: relative; top: 0; height: 62vh; } .margin { border-left: 0; border-top: 1px solid var(--rule); height: auto; overflow: visible; } .margin-scroll { overflow: visible; } }
+@media (max-width: 900px) { .reader { grid-template-columns: 1fr; height: auto; overflow: visible; } .divider { display: none; } .pdf-pane { position: relative; top: 0; height: 62vh; } .margin { border-left: 0; border-top: 1px solid var(--rule); height: auto; overflow: visible; } .margin-scroll { overflow: visible; } }
 
 /* ---------- stats ---------- */
 .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0; border: 1px solid var(--rule); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; }
