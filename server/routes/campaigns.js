@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import crypto from 'node:crypto';
 import { q, db } from '../db.js';
 import { requireMember, requireOwner } from '../auth.js';
-import { sendInvite, mailEnabled } from '../mailer.js';
+import { sendInvite, sendAddedToCampaign, mailEnabled, LINK_TTL_MS } from '../mailer.js';
+import { newToken, hashToken, siteUrl } from '../tokens.js';
 import { str } from '../security.js';
 
 const r = Router();
@@ -53,25 +53,46 @@ r.delete('/:id', requireMember, requireOwner, (req, res) => {
 });
 
 // ---- members & invites ----
+// New address: an invitation with a one-time link (24 h by default) leading to a "choose a password" page.
+// Existing account: added immediately and told by email.
+async function issueInvite(req, res, email) {
+  const user = q.get('SELECT id, name, email FROM users WHERE email = ?', email);
+  const base = siteUrl(req);
+  if (user) {
+    q.run('INSERT OR IGNORE INTO campaign_members (campaign_id, user_id, role) VALUES (?, ?, ?)', req.campaign.id, user.id, 'member');
+    q.run("UPDATE invites SET accepted_at = datetime('now') WHERE campaign_id = ? AND email = ? AND accepted_at IS NULL", req.campaign.id, email);
+    const link = `${base}/campaigns/${req.campaign.id}`;
+    const emailed = await sendAddedToCampaign({ to: email, name: user.name, inviterName: req.user.name, campaignName: req.campaign.name, link });
+    return res.json({ added: true, emailed, mailEnabled, email });
+  }
+  const token = newToken();
+  const expires = Date.now() + LINK_TTL_MS;
+  const existing = q.get('SELECT id FROM invites WHERE campaign_id = ? AND email = ? AND accepted_at IS NULL', req.campaign.id, email);
+  if (existing) q.run("UPDATE invites SET token = ?, expires_at = ?, sent_at = datetime('now'), invited_by = ? WHERE id = ?", hashToken(token), expires, req.user.id, existing.id);
+  else q.run("INSERT INTO invites (campaign_id, email, token, expires_at, sent_at, invited_by) VALUES (?, ?, ?, ?, datetime('now'), ?)", req.campaign.id, email, hashToken(token), expires, req.user.id);
+  const link = `${base}/invite/${token}`;
+  const emailed = await sendInvite({ to: email, inviterName: req.user.name, campaignName: req.campaign.name, link });
+  // The link is only handed back when it could not be emailed: the owner then passes it on by hand.
+  res.json({ added: false, emailed, mailEnabled, email, link: emailed ? undefined : link, expires_at: expires });
+}
+
 r.post('/:id/invites', requireMember, requireOwner, async (req, res) => {
   const email = str(req.body.email, 254).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Enter a valid email address' });
-  const existing = q.get('SELECT u.id FROM users u JOIN campaign_members m ON m.user_id = u.id WHERE u.email = ? AND m.campaign_id = ?', email, req.campaign.id);
-  if (existing) return res.status(409).json({ error: 'Already a member' });
-  // If the user already has an account, add directly.
-  const user = q.get('SELECT id FROM users WHERE email = ?', email);
-  const token = crypto.randomBytes(24).toString('hex');
-  q.run('INSERT INTO invites (campaign_id, email, token) VALUES (?, ?, ?)', req.campaign.id, email, token);
-  const base = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
-  const link = `${base}/invite/${token}`;
-  let emailed = false;
-  try { emailed = await sendInvite({ to: email, inviterName: req.user.name, campaignName: req.campaign.name, link }); } catch (e) { console.error('mail failed', e.message); }
-  res.json({ link, emailed, mailEnabled, existingUser: !!user });
+  if (q.get('SELECT 1 FROM users u JOIN campaign_members m ON m.user_id = u.id WHERE u.email = ? AND m.campaign_id = ?', email, req.campaign.id)) return res.status(409).json({ error: 'Already a member' });
+  await issueInvite(req, res, email);
+});
+
+// Resend: a fresh token and a fresh 24 h window; the previous link stops working.
+r.post('/:id/invites/:inviteId/resend', requireMember, requireOwner, async (req, res) => {
+  const inv = q.get('SELECT * FROM invites WHERE id = ? AND campaign_id = ? AND accepted_at IS NULL', req.params.inviteId, req.campaign.id);
+  if (!inv) return res.status(404).json({ error: 'Invitation not found' });
+  await issueInvite(req, res, inv.email);
 });
 
 r.get('/:id/invites', requireMember, requireOwner, (req, res) => {
-  const base = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-  const rows = q.all('SELECT * FROM invites WHERE campaign_id = ? ORDER BY created_at DESC', req.campaign.id).map(i => ({ ...i, link: `${base}/invite/${i.token}` }));
+  const rows = q.all('SELECT id, email, sent_at, expires_at, accepted_at, created_at FROM invites WHERE campaign_id = ? AND accepted_at IS NULL ORDER BY created_at DESC', req.campaign.id)
+    .map(i => ({ ...i, expired: !!(i.expires_at && i.expires_at < Date.now()) }));
   res.json({ invites: rows });
 });
 

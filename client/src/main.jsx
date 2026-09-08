@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from './auth.jsx';
 import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Invite from './pages/Invite.jsx';
+import Forgot from './pages/Forgot.jsx';
+import Reset from './pages/Reset.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Campaign from './pages/Campaign.jsx';
 import PaperView from './pages/PaperView.jsx';
@@ -26,6 +28,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Login register />} />
           <Route path="/invite/:token" element={<Invite />} />
+          <Route path="/forgot" element={<Forgot />} />
+          <Route path="/reset/:token" element={<Reset />} />
           <Route element={<Private><Layout /></Private>}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/campaigns/:id/*" element={<Campaign />} />

@@ -88,10 +88,21 @@ CREATE TABLE IF NOT EXISTS annotations (
 );
 `);
 
+db.exec(`CREATE TABLE IF NOT EXISTS password_resets (
+  token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at INTEGER NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+)`);
+
 // Lightweight migrations for columns added after the first release.
 const cols = t => db.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name);
 if (!cols('fields').includes('group_name')) db.exec("ALTER TABLE fields ADD COLUMN group_name TEXT DEFAULT ''");
 if (!cols('fields').includes('option_help')) db.exec("ALTER TABLE fields ADD COLUMN option_help TEXT DEFAULT '{}'");
+if (!cols('invites').includes('expires_at')) db.exec("ALTER TABLE invites ADD COLUMN expires_at INTEGER");
+if (!cols('invites').includes('sent_at')) db.exec("ALTER TABLE invites ADD COLUMN sent_at TEXT");
+if (!cols('invites').includes('invited_by')) db.exec("ALTER TABLE invites ADD COLUMN invited_by INTEGER REFERENCES users(id)");
+if (!cols('users').includes('password_changed_at')) db.exec("ALTER TABLE users ADD COLUMN password_changed_at INTEGER DEFAULT 0");
 
 export const q = {
   get: (sql, ...p) => db.prepare(sql).get(...p),

@@ -17,7 +17,7 @@ Single process serving the built React app:
 npm run build && npm start   # http://localhost:4321 (PORT to change)
 ```
 
-Config: see `.env.example` (`JWT_SECRET`, `PORT`, `APP_URL`, `DATA_DIR`, SMTP for emailed invites). Without SMTP, invite links are displayed in the UI to copy and share.
+Config: see `.env.example` (`JWT_SECRET`, `PORT`, `APP_URL`, `DATA_DIR`, SMTP). Without SMTP settings nothing is emailed: invitation links are shown to the owner in the UI and reset links go to the server log.
 
 ## Deploy on a VPS
 
@@ -113,7 +113,7 @@ Notes on how the codebook is mapped:
 1. **Register**, then **create a campaign**. The creator is the owner.
 2. **Criteria** (owner): add one at a time or import a spreadsheet. Options can carry a coding rule (`Option :: rule`).
 3. **Papers** (owner): add manually (PDF required) or import BibTeX. Imported papers without a PDF are flagged and locked.
-4. **Team** (owner): invite by email; invitees set a password and are added automatically.
+4. **Team** (owner): invite by email. New people receive a link to choose a password and join; people who already have an account are added at once and told by email. Links work once and expire after 24 hours (`LINK_TTL_HOURS`); the owner can resend or revoke from the Team page. Everyone can use *Forgot your password?* on the sign-in page.
 5. **Assign** one or more annotators per paper, singly or in bulk.
 6. Annotators open a paper: PDF on the left, criteria grouped by section on the right. Save drafts, then submit (required criteria validated).
 7. **Board**: Kanban with default stages *To review → In progress → Reviewed → Conflict → Done*. Papers auto-advance to *In progress* on first draft and to *Reviewed* once all assignees submit.
@@ -142,11 +142,36 @@ All under `/api`, JSON, cookie-based JWT auth.
 - `PUT …/papers/:pid/annotation` (`{ values, status: 'draft'|'submitted' }`)
 - `GET /campaigns/:id/stats`, `GET /campaigns/:id/stats/export.xlsx`
 
+## Email
+
+Every deployment differs only by `.env`. The mail block is written for OVH mailboxes (MX Plan or Zimbra, the ones behind OVH webmail):
+
+```bash
+APP_URL=https://concord.badmavasan.tech      # used inside every link
+SMTP_HOST=smtp.mail.ovh.net                  # ssl0.ovh.net also works
+SMTP_PORT=465                                # or 587 with SMTP_SECURE=false
+SMTP_SECURE=true
+SMTP_USER=noreply@badmavasan.tech            # the full address of a mailbox you own
+SMTP_PASSWORD=...
+MAIL_FROM=Concord <noreply@badmavasan.tech>  # address must match SMTP_USER
+LINK_TTL_HOURS=24
+```
+
+Create the mailbox in the OVH control panel, put its password in `SMTP_PASSWORD`, restart (`docker compose up -d`), then check the login and send yourself a real message:
+
+```bash
+docker compose exec -u node app node cli.js mail test                 # log in and hang up
+docker compose exec -u node app node cli.js mail test you@univ.edu    # send a test message
+```
+
+Three messages are sent, all in Concord's own look: an invitation with a choose-a-password link, a "you were added" notice for people who already have an account, and a password reset. Tokens are stored hashed, work once, and expire after `LINK_TTL_HOURS`. Changing a password signs out every other session of that account.
+
 ## Security notes
 
-- Sessions are httpOnly, SameSite=Lax cookies signed with HS256; the secret comes from `JWT_SECRET` or is generated once and stored in the data directory. Cookies get the `Secure` flag automatically when `APP_URL` is https.
+- Sessions are httpOnly, SameSite=Lax cookies signed with HS256; the secret comes from `JWT_SECRET` or is generated once and stored in the data directory. Cookies get the `Secure` flag automatically when `APP_URL` is https. A password change invalidates older sessions.
+- Invitation and reset links are 256-bit random tokens stored as SHA-256 hashes, single-use, expiring after 24 hours; the forgot-password route answers identically for known and unknown addresses.
 - State-changing API calls must come from the app's own origin (Origin/Referer check) on top of SameSite, so cross-site forms cannot act on a logged-in session.
-- Sign-in, registration and invite lookups are rate-limited per IP (20 per 15 minutes); the whole API is capped at 600 requests per minute per IP.
+- Sign-in, registration, forgot/reset and invite lookups are rate-limited per IP (20 per 15 minutes); the whole API is capped at 600 requests per minute per IP.
 - Passwords are bcrypt-hashed (cost 11), minimum 8 characters; login takes the same time whether or not the account exists.
 - Uploads are checked for the PDF magic bytes, stored under server-generated names, served with `nosniff`, and capped at 100 MB.
 - Strict security headers (CSP allowing only self plus Google Fonts, frame-ancestors self, nosniff, referrer-policy, HSTS when on https).

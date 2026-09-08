@@ -13,8 +13,10 @@ export function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-    const user = q.get('SELECT id, email, name FROM users WHERE id = ?', payload.id);
+    const user = q.get('SELECT id, email, name, password_changed_at FROM users WHERE id = ?', payload.id);
     if (!user) return res.status(401).json({ error: 'User not found' });
+    if (user.password_changed_at && payload.iat * 1000 < user.password_changed_at - 1000) return res.status(401).json({ error: 'Session expired, sign in again' });
+    delete user.password_changed_at;
     req.user = user;
     next();
   } catch {

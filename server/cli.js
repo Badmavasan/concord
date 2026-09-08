@@ -11,6 +11,7 @@
 //   node cli.js papers add <campaign> --title "..." --pdf file.pdf [--authors ".."] [--year ..] [--venue ..] [--doi ..]
 //   node cli.js assign <campaign> --to a@x.com,b@x.com [--each N] [--unassigned-only]
 //   node cli.js status <campaign>
+//   node cli.js mail test [address]        check the SMTP settings in .env; with an address, send a real message
 // <campaign> is an id or an exact name.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +21,7 @@ import { db, q, UPLOAD_DIR } from './db.js';
 import { parseFieldsWorkbook } from './codebook.js';
 import { parseBibtex, bibToPaper } from './bibtex.js';
 import { normalizeField, insertField } from './routes/fields.js';
+import { mail, mailEnabled, transporter, sendPasswordReset } from './mailer.js';
 
 const argv = process.argv.slice(2);
 const flags = {}; const pos = [];
@@ -46,6 +48,15 @@ function storePdf(src) {
 const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 const cmds = {
+  'mail test': async ([to]) => {
+    if (!mailEnabled) die('No mail settings found. SMTP_HOST, SMTP_USER and SMTP_PASSWORD all have to be set in .env.');
+    console.log(`Host:    ${mail.host}:${mail.port} (${mail.secure ? 'TLS from the start' : 'STARTTLS'})`);
+    console.log(`Mailbox: ${mail.user}`);
+    console.log(`From:    ${mail.from}`);
+    try { await transporter().verify(); console.log('The server accepted the login.'); }
+    catch (e) { die(`The server refused the login: ${e.message}\nUsual causes: SMTP_USER is not the full address, the password is wrong, or the port/secure pair does not match (465+true, 587+false).`); }
+    if (to) { const ok = await sendPasswordReset({ to, name: 'there', link: 'https://example.invalid/reset/test-message' }); console.log(ok ? `Sent a test message to ${to}.` : 'Sending failed, see the error above.'); }
+  },
   'user add': ([email, name]) => {
     if (!email || !name) die('usage: user add <email> <name> [--password X]');
     const em = email.toLowerCase();

@@ -20,7 +20,7 @@ export function AuthFrame({ children }) {
   );
 }
 
-export default function Login({ register = false, inviteToken, inviteEmail, bare }) {
+export default function Login({ register = false, inviteEmail, bare, afterLogin }) {
   const { login, register: doRegister } = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
@@ -28,15 +28,15 @@ export default function Login({ register = false, inviteToken, inviteEmail, bare
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [openReg, setOpenReg] = useState(true);
-  useEffect(() => { if (!inviteToken) api('/auth/config').then(d => setOpenReg(d.openRegistration)).catch(() => {}); }, [inviteToken]);
+  useEffect(() => { if (!bare) api('/auth/config').then(d => setOpenReg(d.openRegistration)).catch(() => {}); }, [bare]);
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const submit = async e => {
     e.preventDefault(); setErr(''); setBusy(true);
     try {
-      const body = { ...form, inviteToken };
-      register ? await doRegister(body) : await login(body);
-      nav(loc.state?.from || '/', { replace: true });
+      register ? await doRegister(form) : await login(form);
+      const to = afterLogin ? await afterLogin() : (loc.state?.from || '/');
+      nav(to, { replace: true });
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
 
@@ -48,8 +48,11 @@ export default function Login({ register = false, inviteToken, inviteEmail, bare
       <label className="field">Password{register && <span className="help">At least 8 characters</span>}<input type="password" value={form.password} onChange={set('password')} required minLength={register ? 8 : undefined} autoComplete={register ? 'new-password' : 'current-password'} /></label>
       {err && <div className="error">{err}</div>}
       <button className="btn primary" disabled={busy} style={{ justifyContent: 'center', padding: 10 }}>{busy ? 'One moment' : register ? 'Create account' : 'Sign in'}</button>
-      {!inviteToken && <div className="muted small" style={{ textAlign: 'center' }}>
-        {register ? <>Already have an account? <Link to="/login">Sign in</Link></> : openReg ? <>New here? <Link to="/register">Create an account</Link></> : <>Accounts are created through invite links from a campaign owner.</>}
+      {!bare && <div className="muted small" style={{ textAlign: 'center' }}>
+        {register ? <>Already have an account? <Link to="/login">Sign in</Link></> : <>
+          <Link to="/forgot">Forgot your password?</Link>
+          <div style={{ marginTop: 6 }}>{openReg ? <>New here? <Link to="/register">Create an account</Link></> : <>Accounts are created through invitation links from a campaign owner.</>}</div>
+        </>}
       </div>}
     </form>
   );
