@@ -40,7 +40,7 @@ Annotators see what is theirs under the *Mine* filter and on *Your reviews* as "
 
 ## 7. Annotate
 
-Open a paper. The PDF is on the left, the criteria on the right, grouped by section. *Save draft* keeps work in progress; *Submit* checks the required criteria and records the answers. A submitted annotation can still be updated.
+Open a paper. The PDF is on the left, the criteria on the right, grouped by section. Every answer is saved automatically a moment after you give it, so you can leave and come back at any time. When you are finished, *Mark as done*: required criteria are checked, the annotation counts in the statistics, and the paper moves forward on the board. Done answers are shown read-only; *Edit answers* lets you change them, and *Save changes* validates again.
 
 The owner can also open any paper and see everyone's answers side by side.
 

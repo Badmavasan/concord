@@ -36,7 +36,8 @@
 ## Assignment and annotation
 
 - One or several annotators per paper; single-row or bulk assignment with add or replace modes.
-- Reader with the PDF pinned beside a scrolling form; a draggable divider sets how much room the form gets (arrow keys on the handle, double-click to reset) and the choice is remembered per browser; drafts and submissions; validation of required fields and option values.
+- Reader with the PDF pinned beside a scrolling form; a draggable divider sets how much room the form gets (arrow keys on the handle, double-click to reset) and the choice is remembered per browser.
+- Answers are saved to the database automatically as they are given (and flushed when the page is left), so nothing is lost by navigating away. *Mark as done* is the explicit validation step: required criteria and option values are checked, the annotation counts in statistics, and the paper advances on the board. A done annotation is shown read-only with *Edit answers*, *Save changes* and *Cancel*.
 - Owner view of all annotators' answers on a paper.
 - Annotation locked while a paper has no PDF.
 
