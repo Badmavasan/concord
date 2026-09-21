@@ -5,6 +5,11 @@
 //     (one row per option; group and question carry forward on blank rows).
 import XLSX from 'xlsx';
 
+// An "other" option opens a text box: "Autre", "Other", "autre : ..." — but not "Autre(s) LLM(s)", which is a real category.
+export const isOtherOption = v => /^(autres?|others?)\s*(:.*)?$/i.test(String(v).trim());
+export const otherKey = fieldId => `${fieldId}:other`;
+export const checkKey = fieldId => `${fieldId}:checks`;
+
 export const FIELD_TYPES = ['text', 'single', 'multi', 'number', 'boolean', 'scale'];
 
 const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();

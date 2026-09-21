@@ -7,9 +7,9 @@ const TYPES = [
   ['boolean', 'Yes or no', ''], ['scale', 'Scale', 'A number between a minimum and a maximum'],
   ['number', 'Number', 'Any numeric value'], ['text', 'Free text', 'A written answer, not scored for agreement'],
 ];
-const blank = { name: '', description: '', type: 'single', options: '', min: 1, max: 5, required: true, group_name: '' };
-const optionsToText = f => (Array.isArray(f.options) ? f.options : []).map(o => f.option_help?.[o] ? `${o} :: ${f.option_help[o]}` : o).join('\n');
-const textToOptions = t => { const options = [], option_help = {}; for (const line of t.split('\n')) { const [label, ...rest] = line.split('::'); const l = label.trim(); if (!l) continue; options.push(l); if (rest.length) option_help[l] = rest.join('::').trim(); } return { options, option_help }; };
+const blank = { name: '', description: '', type: 'single', options: '', min: 1, max: 5, required: true, group_name: '', checks: '' };
+const optionsToText = f => (Array.isArray(f.options) ? f.options : []).map(o => `${o}${(f.text_options || []).includes(o) ? ' [texte]' : ''}${f.option_help?.[o] ? ` :: ${f.option_help[o]}` : ''}`).join('\n');
+const textToOptions = t => { const options = [], option_help = {}, text_options = []; for (const line of t.split('\n')) { const [label, ...rest] = line.split('::'); let l = label.trim(); if (!l) continue; if (/\[(texte|text)\]$/i.test(l)) { l = l.replace(/\s*\[(texte|text)\]$/i, ''); text_options.push(l); } options.push(l); if (rest.length) option_help[l] = rest.join('::').trim(); } return { options, option_help, text_options }; };
 
 export default function FieldsTab({ campaign, fields, reload }) {
   const [editing, setEditing] = useState(null);
@@ -20,13 +20,13 @@ export default function FieldsTab({ campaign, fields, reload }) {
 
   const open = f => {
     setErr('');
-    setForm(f ? { name: f.name, description: f.description || '', type: f.type, options: optionsToText(f), min: f.options?.min ?? 1, max: f.options?.max ?? 5, required: f.required, group_name: f.group_name || '' } : blank);
+    setForm(f ? { name: f.name, description: f.description || '', type: f.type, options: optionsToText(f), min: f.options?.min ?? 1, max: f.options?.max ?? 5, required: f.required, group_name: f.group_name || '', checks: (f.checks || []).map(c => `${c.exclusive ? '!' : ''}${c.label}${c.description ? ' :: ' + c.description : ''}`).join('\n') } : blank);
     setEditing(f || 'new');
   };
   const save = async e => {
     e.preventDefault(); setErr('');
     const parsed = textToOptions(form.options);
-    const body = { name: form.name, description: form.description, type: form.type, required: form.required, group_name: form.group_name, options: form.type === 'scale' ? { min: Number(form.min), max: Number(form.max) } : parsed.options, option_help: parsed.option_help };
+    const body = { name: form.name, description: form.description, type: form.type, required: form.required, group_name: form.group_name, checks: form.checks.split('\n').map(l => l.trim()).filter(Boolean).map(l => { const [lab, ...rest] = l.split('::'); const ex = lab.trim().startsWith('!'); return { label: lab.trim().replace(/^!\s*/, ''), description: rest.join('::').trim(), exclusive: ex }; }), options: form.type === 'scale' ? { min: Number(form.min), max: Number(form.max) } : parsed.options, option_help: parsed.option_help, text_options: parsed.text_options };
     try { editing === 'new' ? await api(base, { method: 'POST', body }) : await api(`${base}/${editing.id}`, { method: 'PATCH', body }); setEditing(null); reload(); } catch (e) { setErr(e.message); }
   };
   const remove = async f => { if (!confirm(`Delete "${f.name}"? Answers already given for it will be hidden.`)) return; await api(`${base}/${f.id}`, { method: 'DELETE' }); reload(); };
@@ -81,8 +81,9 @@ export default function FieldsTab({ campaign, fields, reload }) {
             <label className="field">Section<span className="help">Optional. Criteria with the same section are shown together, e.g. "A : Architecture".</span><input type="text" value={form.group_name} onChange={e => setForm({ ...form, group_name: e.target.value })} list="groups" /><datalist id="groups">{[...new Set(fields.map(f => f.group_name).filter(Boolean))].map(g => <option key={g} value={g} />)}</datalist></label>
             <label className="field">Guidance for annotators<span className="help">Optional. Shown under the question.</span><textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
             <label className="field">Answer type<select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}>{TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select><span className="help">{TYPES.find(t => t[0] === form.type)?.[2]}</span></label>
-            {(form.type === 'single' || form.type === 'multi') && <label className="field">Options<span className="help">One per line. Add a coding rule after two colons, e.g. "Cohort study :: participants followed over time".</span><textarea value={form.options} onChange={e => setForm({ ...form, options: e.target.value })} placeholder={'Randomised trial :: participants allocated at random\nCohort study\nCase report'} required rows={6} /></label>}
+            {(form.type === 'single' || form.type === 'multi') && <label className="field">Options<span className="help">One per line. Add a coding rule after two colons, e.g. "Cohort study :: participants followed over time". An option named Autre or Other opens a text box; end any other option with [texte] to do the same.</span><textarea value={form.options} onChange={e => setForm({ ...form, options: e.target.value })} placeholder={'Randomised trial :: participants allocated at random\nCohort study\nCase report'} required rows={6} /></label>}
             {form.type === 'scale' && <div className="row"><label className="field" style={{ flex: 1 }}>From<input type="number" value={form.min} onChange={e => setForm({ ...form, min: e.target.value })} /></label><label className="field" style={{ flex: 1 }}>To<input type="number" value={form.max} onChange={e => setForm({ ...form, max: e.target.value })} /></label></div>}
+            {(form.type === 'text' || form.type === 'number') && <label className="field">Checkboxes under the answer<span className="help">Optional, one per line, with a meaning after two colons. Ticking one counts as an answer. Start a line with ! for a box that replaces the answer, such as "not applicable".</span><textarea rows={3} value={form.checks} onChange={e => setForm({ ...form, checks: e.target.value })} placeholder={'Non standardisé :: questionnaire built by the authors\n!Non concerné :: no questionnaire in the design'} /></label>}
             <label className="opt"><input type="checkbox" checked={form.required} onChange={e => setForm({ ...form, required: e.target.checked })} /> Required before an annotation can be submitted</label>
             {err && <div className="error">{err}</div>}
             <div className="actions"><button type="button" className="btn" onClick={() => setEditing(null)}>Cancel</button><button className="btn primary">{editing === 'new' ? 'Add criterion' : 'Save changes'}</button></div>

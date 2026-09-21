@@ -46,6 +46,17 @@ Special cases:
 
 Nothing is marked required on import, because codebooks often contain conditional questions. Tick *Required* on the ones that must always be answered.
 
+## Text on an option, checkboxes under a text answer
+
+An option named *Autre* or *Other* (also `autre : ...`) opens a text box when chosen; *Autre(s) LLM(s)* and similar real categories do not. End any other option with `[texte]` to give it a text box too. One text box per question.
+
+For text and number questions, the editor has a *Checkboxes under the answer* field: one per line, a meaning after two colons, and a leading `!` for a box that replaces the answer.
+
+```
+Non standardisé :: questionnaire built by the authors, not validated elsewhere
+!Non concerné :: no questionnaire in the design
+```
+
 ## Coding rules in the UI
 
 When adding or editing a criterion in the UI, write one option per line, and put a coding rule after two colons:

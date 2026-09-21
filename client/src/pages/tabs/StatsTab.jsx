@@ -37,7 +37,7 @@ export default function StatsTab({ campaign }) {
               <tr key={c.paper_id + '-' + i}>
                 <td>{i === 0 && <Link className="title" to={`../papers/${c.paper_id}`}>{c.title}</Link>}</td>
                 <td>{d.field}</td>
-                <td className="small">{d.values.map((v, j) => <div key={j}><span className="muted">{v.user}</span> {Array.isArray(v.value) ? v.value.join(', ') : String(v.value ?? '—')}</div>)}</td>
+                <td className="small">{d.values.map((v, j) => <div key={j}><span className="muted">{v.user}</span> {Array.isArray(v.value) ? v.value.join(', ') : String(v.value ?? '—')}{v.other ? ` (${v.other})` : ''}</div>)}</td>
               </tr>
             )))}</tbody>
           </table></div>
@@ -77,6 +77,8 @@ function FieldCard({ f }) {
             <tbody>{f.pairwise.map((p, i) => <tr key={i}><td>{p.a} and {p.b}</td><td className="num">{p.n}</td><td className="num">{pct(p.exact_agreement)}</td><td className="num">{fmt(p.mean_abs_diff)}</td><td className="num">{fmt(p.pearson)}</td></tr>)}</tbody>
           </table></div>}
         </>)}
+        {f.other_texts?.length > 0 && <div className="small"><span className="muted">Texts entered with "Autre": </span>{f.other_texts.map(t => `${t.text} (${t.count})`).join(', ')}</div>}
+        {f.checks?.some(c => c.count > 0) && <div className="small muted">{f.checks.filter(c => c.count > 0).map(c => `${c.label}: ${c.count}`).join(', ')}</div>}
         {f.type === 'text' && <div className="stat-inline"><span><b>{f.filled}</b> answers written</span><span>average length <b>{f.avg_length}</b> characters</span></div>}
       </div>
     </div>

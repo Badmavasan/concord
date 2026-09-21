@@ -99,6 +99,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS password_resets (
 const cols = t => db.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name);
 if (!cols('fields').includes('group_name')) db.exec("ALTER TABLE fields ADD COLUMN group_name TEXT DEFAULT ''");
 if (!cols('fields').includes('option_help')) db.exec("ALTER TABLE fields ADD COLUMN option_help TEXT DEFAULT '{}'");
+if (!cols('campaigns').includes('guidelines')) db.exec("ALTER TABLE campaigns ADD COLUMN guidelines TEXT DEFAULT ''");
+if (!cols('fields').includes('text_options')) db.exec("ALTER TABLE fields ADD COLUMN text_options TEXT DEFAULT '[]'");
+if (!cols('fields').includes('checks')) db.exec("ALTER TABLE fields ADD COLUMN checks TEXT DEFAULT '[]'");
+if (!cols('campaigns').includes('group_help')) db.exec("ALTER TABLE campaigns ADD COLUMN group_help TEXT DEFAULT '{}'");
 if (!cols('invites').includes('expires_at')) db.exec("ALTER TABLE invites ADD COLUMN expires_at INTEGER");
 if (!cols('invites').includes('sent_at')) db.exec("ALTER TABLE invites ADD COLUMN sent_at TEXT");
 if (!cols('invites').includes('invited_by')) db.exec("ALTER TABLE invites ADD COLUMN invited_by INTEGER REFERENCES users(id)");

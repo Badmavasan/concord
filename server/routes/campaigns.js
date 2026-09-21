@@ -38,14 +38,16 @@ r.post('/', (req, res) => {
 
 r.get('/:id', requireMember, (req, res) => {
   const members = q.all(`SELECT u.id, u.name, u.email, m.role FROM campaign_members m JOIN users u ON u.id = m.user_id WHERE m.campaign_id = ? ORDER BY m.role DESC, u.name`, req.campaign.id);
-  const fields = q.all('SELECT * FROM fields WHERE campaign_id = ? ORDER BY position, id', req.campaign.id).map(f => ({ ...f, options: JSON.parse(f.options || '[]'), option_help: JSON.parse(f.option_help || '{}'), required: !!f.required }));
+  const fields = q.all('SELECT * FROM fields WHERE campaign_id = ? ORDER BY position, id', req.campaign.id).map(f => ({ ...f, options: JSON.parse(f.options || '[]'), option_help: JSON.parse(f.option_help || '{}'), checks: JSON.parse(f.checks || '[]'), text_options: JSON.parse(f.text_options || '[]'), required: !!f.required }));
   const stages = q.all('SELECT * FROM stages WHERE campaign_id = ? ORDER BY position, id', req.campaign.id);
-  res.json({ campaign: { ...req.campaign, role: req.role }, members, fields, stages });
+  let group_help = {}; try { group_help = JSON.parse(req.campaign.group_help || '{}'); } catch {}
+  res.json({ campaign: { ...req.campaign, group_help, role: req.role }, members, fields, stages });
 });
 
 r.patch('/:id', requireMember, requireOwner, (req, res) => {
   const name = req.body.name === undefined ? null : str(req.body.name, 200), description = req.body.description === undefined ? null : str(req.body.description, 2000);
-  q.run('UPDATE campaigns SET name = COALESCE(?, name), description = COALESCE(?, description) WHERE id = ?', name || null, description, req.campaign.id);
+  const guidelines = req.body.guidelines === undefined ? null : str(req.body.guidelines, 20000);
+  q.run('UPDATE campaigns SET name = COALESCE(?, name), description = COALESCE(?, description), guidelines = COALESCE(?, guidelines) WHERE id = ?', name || null, description, guidelines, req.campaign.id);
   res.json({ campaign: q.get('SELECT * FROM campaigns WHERE id = ?', req.campaign.id) });
 });
 

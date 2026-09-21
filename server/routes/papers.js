@@ -6,6 +6,7 @@ import { q, db, UPLOAD_DIR } from '../db.js';
 import { requireMember, requireOwner } from '../auth.js';
 import { parseBibtex, bibToPaper } from '../bibtex.js';
 import { str } from '../security.js';
+import { isOtherOption, otherKey, checkKey } from '../codebook.js';
 
 const r = Router({ mergeParams: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -198,12 +199,16 @@ r.post('/:paperId/move', requireMember, (req, res) => {
 function validate(fields, values) {
   const errors = {};
   for (const f of fields) {
+    const labels = JSON.parse(f.checks || '[]').map(c => c.label); const ticked = Array.isArray(values[checkKey(f.id)]) ? values[checkKey(f.id)].filter(l => labels.includes(l)) : [];
+    if (ticked.length) continue; // a ticked checkbox ("Non concerné", "Non standardisé"…) is an answer
     const v = values[f.id];
     const empty = v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
     if (f.required && empty) { errors[f.id] = 'Required'; continue; }
     if (empty) continue;
     const opts = JSON.parse(f.options || '[]');
     if (f.type === 'single' && !opts.includes(v)) errors[f.id] = 'Invalid option';
+    // An "other" option must come with its text.
+    if ((f.type === 'single' || f.type === 'multi') && !errors[f.id]) { const tx = JSON.parse(f.text_options || '[]'); const picked = (Array.isArray(v) ? v : [v]).find(o => isOtherOption(o) || tx.includes(o)); if (picked && !String(values[otherKey(f.id)] || '').trim()) errors[f.id] = `Describe "${picked}" in the text box`; }
     if (f.type === 'multi' && (!Array.isArray(v) || v.some(x => !opts.includes(x)))) errors[f.id] = 'Invalid option';
     if (f.type === 'number' && !Number.isFinite(Number(v))) errors[f.id] = 'Must be a number';
     if (f.type === 'scale' && (!Number.isFinite(Number(v)) || Number(v) < opts.min || Number(v) > opts.max)) errors[f.id] = `Must be between ${opts.min} and ${opts.max}`;
@@ -220,6 +225,7 @@ r.put('/:paperId/annotation', requireMember, (req, res) => {
   if (!p.pdf_path) return res.status(400).json({ error: 'This paper has no PDF yet; annotation is blocked until one is uploaded' });
   const values = req.body.values && typeof req.body.values === 'object' && !Array.isArray(req.body.values) ? req.body.values : {};
   if (JSON.stringify(values).length > 200000) return res.status(400).json({ error: 'Annotation is too large' });
+  for (const k of Object.keys(values)) if (k.endsWith(':other')) values[k] = str(values[k], 500);
   const status = req.body.status === 'submitted' ? 'submitted' : 'draft';
   if (status === 'submitted') {
     const fields = q.all('SELECT * FROM fields WHERE campaign_id = ?', req.campaign.id);

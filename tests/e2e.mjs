@@ -106,7 +106,7 @@ ok(pdf.byteLength === pdfBytes.length, 'member can fetch pdf');
 // Annotate: fields by name
 const fields = (await call('a', `/campaigns/${cid}`)).fields;
 const F = Object.fromEntries(fields.map(f => [f.name, f.id]));
-const mk = (inc, type, outs, n, qual) => ({ [F['Include?']]: inc, [F['Study type']]: type, [F['Outcomes reported']]: outs, [F['Sample size']]: n, [F['Quality (1-5)']]: qual, [F['Notes']]: 'ok', [F['Manual']]: 'A' });
+const mk = (inc, type, outs, n, qual) => ({ [F['Include?']]: inc, [F['Study type']]: type, ...(type === 'Other' ? { [`${F['Study type']}:other`]: 'Mixed methods' } : {}), [F['Outcomes reported']]: outs, [F['Sample size']]: n, [F['Quality (1-5)']]: qual, [F['Notes']]: 'ok', [F['Manual']]: 'A' });
 err = await call('a', `/campaigns/${cid}/papers/${papers[0].id}/annotation`, { method: 'PUT', body: { values: {}, status: 'submitted' } }).catch(e => e.message);
 ok(/field_errors/.test(err), 'submit validates required fields');
 papers = (await call('a', `/campaigns/${cid}/papers`)).papers;
@@ -202,4 +202,36 @@ console.log('ALL PASSED');
   ok(t['F6. N participants'] === 'number' && t['F6. N items'] === 'number', 'free text with N sub-values becomes numbers');
   ok(r.created.every(f => f.group_name === 'H : Rigueur'), 'group carries forward');
   console.log('CODEBOOK PASSED');
+}
+
+// ---- "other" options carry a text; campaign guidelines ----
+{
+  const c3 = (await call('b', '/campaigns', { method: 'POST', body: { name: 'Other text' } })).campaign;
+  const f1 = (await call('b', `/campaigns/${c3.id}/fields`, { method: 'POST', body: { name: 'Discipline', type: 'single', options: ['Maths', 'Autre'], required: true } })).field;
+  const f2 = (await call('b', `/campaigns/${c3.id}/fields`, { method: 'POST', body: { name: 'Baselines', type: 'multi', options: ['Autre(s) LLM(s)', 'Ablation'], required: false } })).field;
+  const fdp = new FormData(); fdp.append('title', 'P'); fdp.append('pdf', new Blob([pdfBytes], { type: 'application/pdf' }), 'p.pdf');
+  const pp = (await call('b', `/campaigns/${c3.id}/papers`, { method: 'POST', form: fdp })).paper;
+  err = await call('b', `/campaigns/${c3.id}/papers/${pp.id}/annotation`, { method: 'PUT', body: { values: { [f1.id]: 'Autre', [f2.id]: ['Autre(s) LLM(s)'] }, status: 'submitted' } }).catch(e => e.message);
+  ok(/text box/.test(err), '"Autre" without its text cannot be marked as done');
+  await call('b', `/campaigns/${c3.id}/papers/${pp.id}/annotation`, { method: 'PUT', body: { values: { [f1.id]: 'Autre', [`${f1.id}:other`]: 'Musique', [f2.id]: ['Autre(s) LLM(s)'] }, status: 'submitted' } });
+  ok(true, '"Autre" with text is accepted, and "Autre(s) LLM(s)" needs none');
+  const st3 = await call('b', `/campaigns/${c3.id}/stats`);
+  ok(st3.fields[0].other_texts?.[0]?.text === 'Musique' && !st3.fields[1].other_texts, 'statistics list the texts entered with "Autre"');
+  await call('b', `/campaigns/${c3.id}`, { method: 'PATCH', body: { guidelines: 'Annotate the key contribution only.' } });
+  ok((await call('b', `/campaigns/${c3.id}`)).campaign.guidelines === 'Annotate the key contribution only.', 'campaign guidelines saved');
+  console.log('OTHER PASSED');
+}
+
+// ---- "not applicable" checkbox on a free-text criterion ----
+{
+  const c4 = (await call('b', '/campaigns', { method: 'POST', body: { name: 'NA box' } })).campaign;
+  const f = (await call('b', `/campaigns/${c4.id}/fields`, { method: 'POST', body: { name: 'Questionnaires', type: 'text', required: true, checks: [{ label: 'Non standardisé', description: 'ad hoc' }, { label: 'Non concerné', exclusive: true }] } })).field;
+  ok(f.checks.length === 2 && f.checks[1].exclusive === true, 'criterion keeps its checkboxes');
+  const fdp = new FormData(); fdp.append('title', 'P'); fdp.append('pdf', new Blob([pdfBytes], { type: 'application/pdf' }), 'p.pdf');
+  const pp = (await call('b', `/campaigns/${c4.id}/papers`, { method: 'POST', form: fdp })).paper;
+  err = await call('b', `/campaigns/${c4.id}/papers/${pp.id}/annotation`, { method: 'PUT', body: { values: {}, status: 'submitted' } }).catch(e => e.message);
+  ok(/field_errors/.test(err), 'required text still required when the box is not ticked');
+  await call('b', `/campaigns/${c4.id}/papers/${pp.id}/annotation`, { method: 'PUT', body: { values: { [`${f.id}:checks`]: ['Non standardisé'] }, status: 'submitted' } });
+  ok((await call('b', `/campaigns/${c4.id}/stats`)).fields[0].checks[0].count === 1, 'a ticked checkbox counts as an answer');
+  console.log('NA PASSED');
 }

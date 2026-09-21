@@ -21,6 +21,7 @@ campaign list
 fields import <campaign> <file.xlsx> [--only <name prefix>]   criteria from the simple template or a codebook (see criteria.md);
                                                 --only adds just the matching criteria; the campaign is re-sorted to the file's order
 fields delete <campaign> "<criterion name>"      remove one criterion (answers given for it are no longer shown)
+fields sync <campaign> <codebook.json> [--dry-run]   apply a codebook JSON to an existing campaign (see below)
 members add <campaign> <email> [<email>...]     add existing accounts as annotators
 papers import-bib <campaign> <refs.bib> [--pdf-dir <dir>]
 papers attach-pdfs <campaign> <dir>             attach PDFs to papers still missing one
@@ -29,6 +30,23 @@ assign <campaign> --to a@x.org,b@x.org [--each N] [--unassigned-only]
 status <campaign>
 mail test [address]                             check SMTP settings; with an address, send a real message
 ```
+
+## Revising a codebook on a live campaign
+
+`fields sync` applies a codebook JSON to a campaign that may already hold annotations, and migrates the answers instead of losing them. Always run it with `--dry-run` first: it prints every change and writes nothing.
+
+| In the JSON | Effect on the campaign |
+|---|---|
+| `previous_name` on a question | the question is renamed |
+| `previous_value` on an option | the option is renamed and answers follow; two options sharing a `previous_value` split one option into two, and answers get both |
+| `removed_options` with `moved_to` | the option is dropped and its answers move to the named option of another question |
+| `previous_type: "free_text"` with `match` keywords on options | the question becomes a list; earlier texts are converted by keyword, and what is not recognised goes under the *Autre* option with its text |
+| `removed` | the question is deleted (the number of answers no longer shown is reported) |
+| a question absent from the campaign | it is added at its place |
+| `allows_text`, `checkboxes` | text boxes on options and checkboxes under text answers |
+| `general_rules`, group `description` | campaign guidelines and section descriptions |
+
+Questions are matched by name, order follows the file, and questions of the campaign that the file does not mention are kept at the end. Running it twice changes nothing the second time.
 
 ## PDF matching
 

@@ -1,6 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 
 const MIN_W = 320, DEFAULT_W = 440;
+// An "other" option opens a text box: "Autre", "Other", "autre : ..." but not "Autre(s) LLM(s)". Keep in sync with server/codebook.js.
+export const isOtherOption = v => /^(autres?|others?)\s*(:.*)?$/i.test(String(v).trim());
+export const otherKey = id => `${id}:other`;
+export const checkKey = id => `${id}:checks`;
 const readWidth = () => { try { const v = Number(localStorage.getItem('concord.readerWidth')); return v >= MIN_W ? v : DEFAULT_W; } catch { return DEFAULT_W; } };
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
@@ -108,10 +112,11 @@ export default function PaperView() {
             : (
               <form id="annotation" className={submitted && !editing ? 'readonly' : ''} onSubmit={e => { e.preventDefault(); save('submitted'); }}>
                 {submitted && !editing && <div className="note" style={{ marginTop: 12 }}>Marked as done{my_annotation?.updated_at ? ` on ${new Date(my_annotation.updated_at + 'Z').toLocaleString()}` : ''}. Use Edit to change your answers.</div>}
+                {camp.campaign.guidelines && <details className="guidelines" open={!my_annotation}><summary>Annotation guidelines</summary><div>{camp.campaign.guidelines}</div></details>}
                 {camp.fields.some(f => f.option_help && Object.keys(f.option_help).length) && <label className="opt small muted" style={{ padding: '10px 0 0' }}><input type="checkbox" checked={guide} onChange={e => setGuide(e.target.checked)} /> Show coding rules under each option</label>}
                 {camp.fields.map((f, i) => <Fragment key={f.id}>
-                  {f.group_name && (i === 0 || camp.fields[i - 1].group_name !== f.group_name) && <h3 className="section-head">{f.group_name}</h3>}
-                  <Question f={f} n={i + 1} value={values[f.id]} error={fieldErrors[f.id]} guide={guide} disabled={submitted && !editing} onChange={v => setVal(f.id, v)} />
+                  {f.group_name && (i === 0 || camp.fields[i - 1].group_name !== f.group_name) && <><h3 className="section-head">{f.group_name}</h3>{camp.campaign.group_help?.[f.group_name] && <p className="section-help">{camp.campaign.group_help[f.group_name]}</p>}</>}
+                  <Question f={f} n={i + 1} value={values[f.id]} other={values[otherKey(f.id)]} ticked={values[checkKey(f.id)]} onTick={l => setVal(checkKey(f.id), l)} error={fieldErrors[f.id]} guide={guide} disabled={submitted && !editing} onChange={v => setVal(f.id, v)} onOther={t => setVal(otherKey(f.id), t)} />
                 </Fragment>)}
               </form>
             )}
@@ -121,7 +126,7 @@ export default function PaperView() {
               {showOthers && others.map(a => (
                 <div key={a.id} className="panel" style={{ marginTop: 10, padding: 14 }}>
                   <div className="person" style={{ marginBottom: 6 }}><Avatar name={a.user_name} status={a.status} /> <strong>{a.user_name}</strong> <span className={'tag ' + (a.status === 'submitted' ? 'ok' : 'warn')}>{a.status}</span></div>
-                  <table className="small"><tbody>{camp.fields.map(f => <tr key={f.id}><td className="muted" style={{ width: 150, padding: '4px 0', border: 0 }}>{f.name}</td><td style={{ padding: '4px 0', border: 0 }}>{fmtVal(a.values[f.id])}</td></tr>)}</tbody></table>
+                  <table className="small"><tbody>{camp.fields.map(f => <tr key={f.id}><td className="muted" style={{ width: 150, padding: '4px 0', border: 0 }}>{f.name}</td><td style={{ padding: '4px 0', border: 0 }}>{(a.values[checkKey(f.id)] || []).length ? `[${a.values[checkKey(f.id)].join(', ')}] ${a.values[f.id] || ''}` : fmtVal(a.values[f.id])}{a.values[otherKey(f.id)] ? ` (${a.values[otherKey(f.id)]})` : ''}</td></tr>)}</tbody></table>
                 </div>
               ))}
             </div>
@@ -154,15 +159,22 @@ export default function PaperView() {
 
 const fmtVal = v => v == null || v === '' ? '—' : Array.isArray(v) ? v.join(', ') : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v);
 
-function Question({ f, n, value, error, guide, disabled, onChange }) {
+function Question({ f, n, value, other, ticked, onTick, error, guide, disabled, onChange, onOther }) {
   const name = 'f' + f.id;
+  const takesText = o => isOtherOption(o) || (f.text_options || []).includes(o);
+  const firstText = (Array.isArray(value) ? f.options.filter(o => value.includes(o)) : [value]).find(takesText); // one text box per question
+  const otherBox = o => takesText(o) && o === firstText ? <input type="text" className="other-text" value={other || ''} onChange={e => onOther(e.target.value)} placeholder="Précisez" aria-label={`${o}: précisez`} disabled={disabled} maxLength={500} /> : null;
   const help = o => guide && f.option_help?.[o] ? <span className="opt-help">{f.option_help[o]}</span> : null;
   let input;
-  if (f.type === 'text') input = <textarea value={value || ''} onChange={e => onChange(e.target.value)} rows={3} disabled={disabled} />;
-  else if (f.type === 'number') input = <input type="number" step="any" value={value ?? ''} onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 160 }} disabled={disabled} />;
+  const checks = f.checks || []; const on = Array.isArray(ticked) ? ticked : [];
+  const na = checks.some(c => c.exclusive && on.includes(c.label)); // an exclusive box replaces the text
+  const toggle = (c, b) => { const next = b ? (c.exclusive ? [c.label] : [...on.filter(l => !checks.find(x => x.label === l)?.exclusive), c.label]) : on.filter(l => l !== c.label); onTick(next); if (b && c.exclusive && value) onChange(''); };
+  const naBox = checks.length ? <div className="choices" style={{ marginTop: 6 }}>{checks.map(c => <label key={c.label} className={'opt' + (guide && c.description ? ' with-help' : '')}><input type="checkbox" checked={on.includes(c.label)} onChange={e => toggle(c, e.target.checked)} disabled={disabled} /><span>{c.label}{guide && c.description ? <span className="opt-help">{c.description}</span> : null}</span></label>)}</div> : null;
+  if (f.type === 'text') input = <><textarea value={na ? '' : (value || '')} onChange={e => onChange(e.target.value)} rows={3} disabled={disabled || na} />{naBox}</>;
+  else if (f.type === 'number') input = <><input type="number" step="any" value={value ?? ''} onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))} style={{ width: 160 }} disabled={disabled || na} />{naBox}</>;
   else if (f.type === 'boolean') input = <div className="yn">{[[true, 'Yes'], [false, 'No']].map(([v, l]) => <label key={l}><input type="radio" name={name} checked={value === v} onChange={() => onChange(v)} disabled={disabled} />{l}</label>)}</div>;
-  else if (f.type === 'single') input = <div className="choices">{f.options.map(o => <label key={o} className={'opt' + (help(o) ? ' with-help' : '')}><input type="radio" name={name} checked={value === o} onChange={() => onChange(o)} disabled={disabled} /><span>{o}{help(o)}</span></label>)}</div>;
-  else if (f.type === 'multi') input = <div className="choices">{f.options.map(o => <label key={o} className={'opt' + (help(o) ? ' with-help' : '')}><input type="checkbox" checked={(value || []).includes(o)} onChange={e => onChange(e.target.checked ? [...(value || []), o] : (value || []).filter(x => x !== o))} disabled={disabled} /><span>{o}{help(o)}</span></label>)}</div>;
+  else if (f.type === 'single') input = <div className="choices">{f.options.map(o => <label key={o} className={'opt' + (help(o) ? ' with-help' : '')}><input type="radio" name={name} checked={value === o} onChange={() => onChange(o)} disabled={disabled} /><span>{o}{help(o)}{otherBox(o)}</span></label>)}</div>;
+  else if (f.type === 'multi') input = <div className="choices">{f.options.map(o => <label key={o} className={'opt' + (help(o) ? ' with-help' : '')}><input type="checkbox" checked={(value || []).includes(o)} onChange={e => onChange(e.target.checked ? [...(value || []), o] : (value || []).filter(x => x !== o))} disabled={disabled} /><span>{o}{help(o)}{otherBox(o)}</span></label>)}</div>;
   else if (f.type === 'scale') { const pts = []; for (let i = f.options.min; i <= f.options.max; i++) pts.push(i); input = <div className="scale">{pts.map(i => <label key={i}><input type="radio" name={name} checked={Number(value) === i} onChange={() => onChange(i)} disabled={disabled} />{i}</label>)}</div>; }
   return (
     <div className={'question' + (error ? ' invalid' : '')}>

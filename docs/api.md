@@ -25,7 +25,7 @@ All routes are under `/api`, speak JSON, and use the session cookie set at sign-
 | GET | `/campaigns` | member: list with counts and "waiting for you" |
 | POST | `/campaigns` | `{ name, description }` |
 | GET | `/campaigns/:id` | member: campaign, members, fields, stages |
-| PATCH | `/campaigns/:id` | owner |
+| PATCH | `/campaigns/:id` | owner: `{ name, description, guidelines }` |
 | DELETE | `/campaigns/:id` | owner: `{ confirm: <campaign name> }`; removes PDF files too |
 | POST | `/campaigns/:id/transfer` | owner: `{ user_id }` |
 | POST | `/campaigns/:id/invites` | owner: `{ email }` → `{ added, emailed, link?, expires_at }` |
@@ -42,7 +42,7 @@ All routes are under `/api`, speak JSON, and use the session cookie set at sign-
 
 | Method | Path | Who |
 |---|---|---|
-| POST | `/campaigns/:id/fields` | owner: `{ name, type, options, option_help, required, description, group_name }` |
+| POST | `/campaigns/:id/fields` | owner: `{ name, type, options, option_help, text_options, checks, required, description, group_name }` |
 | PATCH | `/campaigns/:id/fields/:fieldId` | owner |
 | PUT | `/campaigns/:id/fields/order` | owner: `{ order }` |
 | DELETE | `/campaigns/:id/fields/:fieldId` | owner |
@@ -66,6 +66,8 @@ All routes are under `/api`, speak JSON, and use the session cookie set at sign-
 | PUT | `/campaigns/:id/papers/:pid/assignees` | owner: `{ user_ids }` |
 | POST | `/campaigns/:id/papers/:pid/move` | member: `{ stage_id, position }` |
 | PUT | `/campaigns/:id/papers/:pid/annotation` | assignee or owner: `{ values, status: "draft" \| "submitted" }` |
+
+Annotation `values` are keyed by criterion id. Two companion keys exist: `"<id>:other"` holds the text of an option that takes one, and `"<id>:checks"` holds the labels of ticked checkboxes.
 
 ## Statistics
 

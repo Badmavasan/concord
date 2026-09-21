@@ -29,14 +29,14 @@ function normalizeField(body) {
   const required = body.required === undefined ? 1 : (String(body.required).toLowerCase() === 'true' || body.required === 1 || body.required === true || String(body.required).toLowerCase() === 'yes' ? 1 : 0);
   let option_help = body.option_help && typeof body.option_help === 'object' ? body.option_help : {};
   if (Array.isArray(options)) option_help = Object.fromEntries(Object.entries(option_help).filter(([k, v]) => options.includes(k) && v)); else option_help = {};
-  return { name, type, options: JSON.stringify(options), required, description: String(body.description || '').trim().slice(0, 5000), group_name: String(body.group_name || '').trim().slice(0, 200), option_help: JSON.stringify(Object.fromEntries(Object.entries(option_help).map(([k, v]) => [k, String(v).slice(0, 2000)]))) };
+  return { name, type, options: JSON.stringify(options), required, description: String(body.description || '').trim().slice(0, 5000), group_name: String(body.group_name || '').trim().slice(0, 200), text_options: JSON.stringify(Array.isArray(options) && Array.isArray(body.text_options) ? body.text_options.filter(o => options.includes(o)) : []), checks: JSON.stringify((type === 'text' || type === 'number') && Array.isArray(body.checks) ? body.checks.filter(c => c && String(c.label || '').trim()).slice(0, 10).map(c => ({ label: String(c.label).trim().slice(0, 80), description: String(c.description || '').trim().slice(0, 2000), exclusive: !!c.exclusive })) : []), option_help: JSON.stringify(Object.fromEntries(Object.entries(option_help).map(([k, v]) => [k, String(v).slice(0, 2000)]))) };
 }
 
 function nextPos(cid) { return q.get('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM fields WHERE campaign_id = ?', cid).p; }
-function present(f) { return { ...f, options: JSON.parse(f.options || '[]'), option_help: JSON.parse(f.option_help || '{}'), required: !!f.required }; }
+function present(f) { return { ...f, options: JSON.parse(f.options || '[]'), option_help: JSON.parse(f.option_help || '{}'), checks: JSON.parse(f.checks || '[]'), text_options: JSON.parse(f.text_options || '[]'), required: !!f.required }; }
 export function insertField(cid, f) {
-  const info = q.run('INSERT INTO fields (campaign_id, name, description, type, options, required, position, group_name, option_help) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    cid, f.name, f.description, f.type, f.options, f.required, nextPos(cid), f.group_name, f.option_help);
+  const info = q.run('INSERT INTO fields (campaign_id, name, description, type, options, required, position, group_name, option_help, checks, text_options) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    cid, f.name, f.description, f.type, f.options, f.required, nextPos(cid), f.group_name, f.option_help, f.checks, f.text_options);
   return present(q.get('SELECT * FROM fields WHERE id = ?', info.lastInsertRowid));
 }
 export { normalizeField };
@@ -52,7 +52,7 @@ r.patch('/:fieldId', requireMember, requireOwner, (req, res) => {
     const cur = q.get('SELECT * FROM fields WHERE id = ? AND campaign_id = ?', req.params.fieldId, req.campaign.id);
     if (!cur) return res.status(404).json({ error: 'Field not found' });
     const f = normalizeField({ ...present(cur), ...req.body });
-    q.run('UPDATE fields SET name = ?, description = ?, type = ?, options = ?, required = ?, group_name = ?, option_help = ? WHERE id = ?', f.name, f.description, f.type, f.options, f.required, f.group_name, f.option_help, cur.id);
+    q.run('UPDATE fields SET name = ?, description = ?, type = ?, options = ?, required = ?, group_name = ?, option_help = ?, checks = ?, text_options = ? WHERE id = ?', f.name, f.description, f.type, f.options, f.required, f.group_name, f.option_help, f.checks, f.text_options, cur.id);
     res.json({ field: present(q.get('SELECT * FROM fields WHERE id = ?', cur.id)) });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });

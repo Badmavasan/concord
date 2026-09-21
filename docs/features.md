@@ -13,6 +13,9 @@
 - Optional section (group) per criterion; sections appear as headers in the form and in statistics.
 - Optional guidance text per criterion and a coding rule per option, shown to annotators (with a toggle to hide the rules once familiar).
 - Required flag, enforced at submission.
+- Options that take a text: any option named *Autre* or *Other* opens a text box when chosen, and any other option can be marked `[texte]` to do the same. The text is required to mark the annotation as done, appears in the export, and is listed by frequency in the statistics so recurring values can become options.
+- Checkboxes under a text or number answer, each with its own meaning, such as *Non standardisé* or *Non concerné*. Ticking one counts as an answer; an exclusive box also clears and disables the text.
+- Annotation guidelines per campaign, shown at the top of every annotation form, and a description per section shown under its header.
 - Reordering with arrows; editing and deletion at any time.
 - Spreadsheet import: simple template or codebook layout, French and English type names ([details](criteria.md)).
 - Downloadable Excel template.

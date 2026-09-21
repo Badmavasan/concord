@@ -4,7 +4,7 @@ import { api } from '../../api.js';
 
 export default function SettingsTab({ campaign, reload }) {
   const nav = useNavigate();
-  const [form, setForm] = useState({ name: campaign.name, description: campaign.description || '' });
+  const [form, setForm] = useState({ name: campaign.name, description: campaign.description || '', guidelines: campaign.guidelines || '' });
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -27,6 +27,7 @@ export default function SettingsTab({ campaign, reload }) {
       <form className="panel stack" onSubmit={save}>
         <label className="field">Name<input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required /></label>
         <label className="field">Description<textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></label>
+        <label className="field">Annotation guidelines<span className="help">General rules shown to annotators at the top of every annotation form, for instance what part of a paper to annotate and how to treat what the authors do not state.</span><textarea rows={8} value={form.guidelines} onChange={e => setForm({ ...form, guidelines: e.target.value })} /></label>
         {err && <div className="error">{err}</div>}
         <div className="row spread"><span className="success">{saved ? 'Saved' : ''}</span><button className="btn primary">Save changes</button></div>
       </form>
