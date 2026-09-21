@@ -180,3 +180,26 @@ console.log('ALL PASSED');
   ok((await call('b', '/campaigns')).campaigns.every(c => c.id !== cid), 'not listed any more');
   console.log('DELETE PASSED');
 }
+
+// ---- codebook layout: "N binaires", "Choix unique + binaire", "N ..." free text ----
+{
+  const XLSX = (await import('../server/node_modules/xlsx/xlsx.mjs'));
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['Groupe', 'Statut', 'Question / Variable', 'Type de réponse', 'Option / Valeur', "Logique d'annotation"],
+    ['H : Rigueur', 'Nouveau', 'H6. Validité du juge', '3 binaires', 'Même famille ?', 'Oui if same family'], ['', '', '', '', 'Validé contre humains ?', 'Oui if validated'], ['', '', '', '', 'Accord rapporté ?', 'Oui if reported'],
+    ['', 'Nouveau', 'D6. Données transmises', 'Choix unique + binaire', 'PII', 'Identifiable'], ['', '', '', '', 'Aucune', 'None'], ['', '', '', '', '+ RGPD discuté : Oui/Non', 'Oui if GDPR discussed'],
+    ['', 'Nouveau', 'F6. Échelle', 'Texte libre', 'N participants', 'Number of humans'], ['', '', '', '', 'N items', 'Number of items'],
+  ]);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Codebook');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  const c2 = (await call('b', '/campaigns', { method: 'POST', body: { name: 'Codebook layout' } })).campaign;
+  const fd = new FormData(); fd.append('file', new Blob([buf]), 'cb.xlsx');
+  const r = await call('b', `/campaigns/${c2.id}/fields/import`, { method: 'POST', form: fd });
+  const t = Object.fromEntries(r.created.map(f => [f.name, f.type]));
+  ok(r.errors.length === 0 && r.created.length === 7, `codebook import created 7 criteria (${r.created.length}; ${r.errors})`);
+  ok(t['H6. Même famille ?'] === 'boolean' && t['H6. Validé contre humains ?'] === 'boolean' && t['H6. Accord rapporté ?'] === 'boolean', '"3 binaires" becomes three yes/no criteria');
+  ok(t['D6. Données transmises'] === 'single' && t['D6. RGPD discuté'] === 'boolean', '"Choix unique + binaire" becomes a choice plus a yes/no');
+  ok(t['F6. N participants'] === 'number' && t['F6. N items'] === 'number', 'free text with N sub-values becomes numbers');
+  ok(r.created.every(f => f.group_name === 'H : Rigueur'), 'group carries forward');
+  console.log('CODEBOOK PASSED');
+}

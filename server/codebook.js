@@ -78,6 +78,11 @@ function parseCodebook(rows) {
     const rawType = lower(qn.rawType);
     const base = { group_name: qn.group_name, required: false, description: '', option_help: {} };
     const opts = qn.options.filter(o => o.label);
+    // "3 binaires": every listed sub-question is its own yes/no criterion.
+    if (/^\d+\s*binaires?$/.test(rawType)) {
+      for (const o of opts) fields.push({ ...base, name: `${shortCode(qn.name)}${o.label}`, type: 'boolean', options: [], description: o.help, parent: qn.name });
+      continue;
+    }
     // "Choix unique + binaire": a single choice followed by a companion yes/no field marked with a leading "+".
     if (rawType.includes('binaire')) {
       const extra = opts.filter(o => o.label.startsWith('+'));
@@ -85,7 +90,7 @@ function parseCodebook(rows) {
       fields.push(choiceField(qn, 'single', main, base));
       for (const e of extra) {
         const label = e.label.replace(/^\+\s*/, '').replace(/\s*:\s*(oui\/non|yes\/no).*$/i, '').trim();
-        fields.push({ ...base, name: `${shortCode(qn.name)}${label}`, type: 'boolean', options: [], description: e.help });
+        fields.push({ ...base, name: `${shortCode(qn.name)}${label}`, type: 'boolean', options: [], description: e.help, parent: qn.name });
       }
       continue;
     }
@@ -95,7 +100,7 @@ function parseCodebook(rows) {
       const real = opts.filter(o => !/^(texte libre|free text|nous|text)$/i.test(o.label));
       // Several "N ..." sub-values -> one number field each.
       if (real.length > 1 && real.every(o => /^n\b/i.test(o.label))) {
-        for (const o of real) fields.push({ ...base, name: `${shortCode(qn.name)}${o.label}`, type: 'number', options: [], description: o.help });
+        for (const o of real) fields.push({ ...base, name: `${shortCode(qn.name)}${o.label}`, type: 'number', options: [], description: o.help, parent: qn.name });
         continue;
       }
       const description = real.length > 1

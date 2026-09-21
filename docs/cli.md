@@ -18,7 +18,9 @@ user add <email> <name> [--password X]          create an account (password gene
 user password <email> <newPassword>             reset someone's password
 campaign create "<name>" --owner <email> [--description "..."]
 campaign list
-fields import <campaign> <file.xlsx>            criteria from the simple template or a codebook (see criteria.md)
+fields import <campaign> <file.xlsx> [--only <name prefix>]   criteria from the simple template or a codebook (see criteria.md);
+                                                --only adds just the matching criteria; the campaign is re-sorted to the file's order
+fields delete <campaign> "<criterion name>"      remove one criterion (answers given for it are no longer shown)
 members add <campaign> <email> [<email>...]     add existing accounts as annotators
 papers import-bib <campaign> <refs.bib> [--pdf-dir <dir>]
 papers attach-pdfs <campaign> <dir>             attach PDFs to papers still missing one

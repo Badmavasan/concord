@@ -4,7 +4,8 @@
 //   node cli.js user password <email> <newPassword>
 //   node cli.js campaign create "<name>" --owner <email> [--description "..."]
 //   node cli.js campaign list
-//   node cli.js fields import <campaign> <codebook.xlsx>
+//   node cli.js fields import <campaign> <codebook.xlsx> [--only <name prefix>]   (re-sorts criteria to the file's order)
+//   node cli.js fields delete <campaign> "<criterion name>"
 //   node cli.js members add <campaign> <email> [<email>...]
 //   node cli.js papers import-bib <campaign> <refs.bib> [--pdf-dir <dir>]
 //   node cli.js papers attach-pdfs <campaign> <dir>
@@ -87,12 +88,30 @@ const cmds = {
   'fields import': ([ref, file]) => {
     if (!ref || !file) die('usage: fields import <campaign> <file.xlsx>');
     const c = findCampaign(ref);
-    const parsed = parseFieldsWorkbook(fs.readFileSync(file));
+    const all = parseFieldsWorkbook(fs.readFileSync(file));
+    const parsed = flags.only ? all.filter(p => p.name.startsWith(String(flags.only))) : all;
+    if (!parsed.length) die(`Nothing in the file starts with "${flags.only}"`);
     let n = 0;
     db.prepare('BEGIN').run();
-    for (const p of parsed) { try { insertField(c.id, normalizeField(p)); n++; } catch (e) { console.error(`skip "${p.name}": ${e.message}`); } }
+    for (const p of parsed) {
+      if (flags.only && q.get('SELECT id FROM fields WHERE campaign_id = ? AND name = ?', c.id, p.name)) { console.error(`skip "${p.name}": already present`); continue; }
+      try { insertField(c.id, normalizeField(p)); n++; } catch (e) { console.error(`skip "${p.name}": ${e.message}`); }
+    }
+    // Keep the campaign in the file's order; criteria not in the file keep their relative order at the end.
+    const order = new Map(all.map((p, i) => [p.name, i]));
+    const current = q.all('SELECT id, name, position FROM fields WHERE campaign_id = ? ORDER BY position, id', c.id);
+    current.sort((a, b) => (order.has(a.name) ? order.get(a.name) : 1e6 + a.position) - (order.has(b.name) ? order.get(b.name) : 1e6 + b.position));
+    current.forEach((f, i) => q.run('UPDATE fields SET position = ? WHERE id = ?', i, f.id));
     db.prepare('COMMIT').run();
     console.log(`Imported ${n} of ${parsed.length} criteria into "${c.name}"`);
+  },
+  'fields delete': ([ref, name]) => {
+    if (!ref || !name) die('usage: fields delete <campaign> "<criterion name>"');
+    const c = findCampaign(ref);
+    const f = q.get('SELECT id FROM fields WHERE campaign_id = ? AND name = ?', c.id, name) || die(`No criterion named "${name}" in "${c.name}"`);
+    const used = q.all("SELECT values_json FROM annotations a JOIN papers p ON p.id = a.paper_id WHERE p.campaign_id = ?", c.id).filter(a => { const v = JSON.parse(a.values_json || '{}')[f.id]; return v !== undefined && v !== null && v !== ''; }).length;
+    q.run('DELETE FROM fields WHERE id = ?', f.id);
+    console.log(`Deleted "${name}" from "${c.name}"${used ? ` (${used} annotations had an answer for it; those answers are no longer shown)` : ''}`);
   },
   'members add': ([ref, ...emails]) => {
     if (!ref || !emails.length) die('usage: members add <campaign> <email> [...]');

@@ -39,6 +39,7 @@ Type names understood, in French or English: `Choix unique` / `single` (also the
 Special cases:
 
 - `Choix unique + binaire`: the options starting with `+` become a separate yes/no criterion placed next to the main one.
+- `3 binaires` (any number): every listed sub-question becomes its own yes/no criterion, with its coding rule as guidance.
 - A free-text question whose sub-values all start with `N ` (for instance "N participants", "N items") becomes one number criterion per sub-value.
 - A free-text question with several described sub-values keeps them as guidance text.
 - Each option's coding rule is stored and shown under that option in the annotation form.
