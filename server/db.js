@@ -106,6 +106,7 @@ if (!cols('campaigns').includes('group_help')) db.exec("ALTER TABLE campaigns AD
 if (!cols('invites').includes('expires_at')) db.exec("ALTER TABLE invites ADD COLUMN expires_at INTEGER");
 if (!cols('invites').includes('sent_at')) db.exec("ALTER TABLE invites ADD COLUMN sent_at TEXT");
 if (!cols('invites').includes('invited_by')) db.exec("ALTER TABLE invites ADD COLUMN invited_by INTEGER REFERENCES users(id)");
+if (!cols('users').includes('token_version')) db.exec("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0");
 if (!cols('users').includes('password_changed_at')) db.exec("ALTER TABLE users ADD COLUMN password_changed_at INTEGER DEFAULT 0");
 
 export const q = {

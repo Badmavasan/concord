@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { selKey } from './StatsTab.jsx';
 import { api } from '../../api.js';
 import Modal from '../../components/Modal.jsx';
 import Avatar, { Assignees } from '../../components/Avatar.jsx';
@@ -13,6 +14,8 @@ export default function PapersTab({ campaign, members, owner, fields }) {
   const [filter, setFilter] = useState('all');
   const [drop, setDrop] = useState(null); // null | 'over' | { busy } | { report }
   const dragDepth = useRef(0);
+  const navigate = useNavigate();
+  const resultsFor = () => { try { localStorage.setItem(selKey(campaign.id), JSON.stringify({ mode: 'selected', ids: [...selected] })); } catch {} navigate('../stats'); };
   const base = `/campaigns/${campaign.id}/papers`;
   const load = () => api(base).then(d => setPapers(d.papers));
   useEffect(() => { load(); }, [campaign.id]);
@@ -62,7 +65,7 @@ export default function PapersTab({ campaign, members, owner, fields }) {
       {owner && fields.length === 0 && papers.length > 0 && <div className="note">No criteria defined yet, so annotators have nothing to answer. <Link to="../fields">Add criteria</Link>.</div>}
       <div className="row spread">
         <div className="seg">{filters.map(([k, l]) => <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{l} {counts[k] > 0 && <span style={{ opacity: .6 }}>{counts[k]}</span>}</button>)}</div>
-        {owner && selected.size > 0 && <div className="row"><span className="small muted">{selected.size} selected</span><button className="btn mark sm" onClick={() => setModal({ bulk: [...selected] })}>Assign annotators</button><button className="btn quiet sm" onClick={() => setSelected(new Set())}>Clear</button></div>}
+        {owner && selected.size > 0 && <div className="row"><span className="small muted">{selected.size} selected</span><button className="btn mark sm" onClick={() => setModal({ bulk: [...selected] })}>Assign annotators</button><button className="btn sm" onClick={resultsFor}>View results</button><button className="btn quiet sm" onClick={() => setSelected(new Set())}>Clear</button></div>}
       </div>
       {shown.length === 0 ? (
         <div className="empty"><strong>{papers.length ? 'Nothing matches this filter' : 'No papers yet'}</strong>{papers.length ? '' : owner ? 'Import a .bib export from your reference manager, or add papers one at a time.' : 'The owner has not added papers yet.'}</div>

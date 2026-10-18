@@ -136,8 +136,8 @@ ok(Math.abs(typ.pairwise[0].kappa - 0.5) < 1e-9, 'Study type cohen kappa = 0.5')
 ok(st.conflicts.length === 2, `conflicts on 2 papers (got ${st.conflicts.length})`);
 console.log('multi:', JSON.stringify(st.fields.find(f => f.type === 'multi').per_option.map(o => [o.option, o.mean_pairwise_kappa])));
 console.log('number:', JSON.stringify(st.fields.find(f => f.type === 'number').pairwise));
-err = await call('b', `/campaigns/${cid}/stats`).catch(e => e.message);
-ok(/403/.test(err), 'member cannot see stats');
+const stm = await call('b', `/campaigns/${cid}/stats`);
+ok(stm.scope.role === 'member' && stm.scope.visible === 3 && stm.scope.visible < (await call('a', `/campaigns/${cid}/stats`)).scope.visible + 1, 'member sees results for the papers they marked as done');
 const xl = await call('a', `/campaigns/${cid}/stats/export.xlsx`);
 ok(xl.byteLength > 1000, 'xlsx export works');
 console.log('ALL PASSED');
@@ -164,7 +164,7 @@ console.log('ALL PASSED');
   await call('a', `/campaigns/${cid}/transfer`, { method: 'POST', body: { user_id: 2 } });
   ok((await call('b', `/campaigns/${cid}`)).campaign.role === 'owner', 'bob is now owner');
   ok((await call('a', `/campaigns/${cid}`)).campaign.role === 'member', 'alice is now a member');
-  err = await call('a', `/campaigns/${cid}/stats`).catch(e => e.message); ok(/403/.test(err), 'former owner loses stats access');
+  const fo = await call('a', `/campaigns/${cid}/stats`); ok(fo.scope.role === 'member' && fo.paper_list.every(p => p.mine), 'former owner keeps results only for papers they marked as done');
   await call('b', `/campaigns/${cid}/stats`); ok(true, 'new owner sees stats');
   console.log('EXTRA PASSED');
 }
@@ -234,4 +234,81 @@ console.log('ALL PASSED');
   await call('b', `/campaigns/${c4.id}/papers/${pp.id}/annotation`, { method: 'PUT', body: { values: { [`${f.id}:checks`]: ['Non standardisé'] }, status: 'submitted' } });
   ok((await call('b', `/campaigns/${c4.id}/stats`)).fields[0].checks[0].count === 1, 'a ticked checkbox counts as an answer');
   console.log('NA PASSED');
+}
+
+// ---- results for annotators: only papers they marked as done; paper filter; colleagues' answers after own ----
+{
+  await call('d', '/auth/register', { method: 'POST', body: { email: 'dana@x.com', name: 'Dana', password: 'danapass123' } });
+  const c5 = (await call('b', '/campaigns', { method: 'POST', body: { name: 'Results scope' } })).campaign;
+  for (const e of ['alice@x.com', 'dana@x.com']) await call('b', `/campaigns/${c5.id}/invites`, { method: 'POST', body: { email: e } });
+  const fq = (await call('b', `/campaigns/${c5.id}/fields`, { method: 'POST', body: { name: 'Include', type: 'single', options: ['Yes', 'No'] } })).field;
+  const ps = [];
+  for (const t of ['P1', 'P2', 'P3']) { const fd = new FormData(); fd.append('title', t); fd.append('pdf', new Blob([pdfBytes], { type: 'application/pdf' }), 'p.pdf'); ps.push((await call('b', `/campaigns/${c5.id}/papers`, { method: 'POST', form: fd })).paper); }
+  const uid = async who => (await call(who, '/auth/me')).user.id;
+  await call('b', `/campaigns/${c5.id}/papers/bulk-assign`, { method: 'POST', body: { paper_ids: ps.map(p => p.id), user_ids: [await uid('a'), await uid('b'), await uid('d')] } });
+  const put = (who, p, v, status = 'submitted') => call(who, `/campaigns/${c5.id}/papers/${p.id}/annotation`, { method: 'PUT', body: { values: { [fq.id]: v }, status } });
+  await put('b', ps[0], 'Yes'); await put('b', ps[1], 'No');
+  await put('a', ps[0], 'No'); await put('a', ps[1], 'Yes', 'draft');
+
+  err = await call('d', `/campaigns/${c5.id}/stats`).catch(e => e.message); ok(/403/.test(err) && /marked at least one/.test(err), 'annotator with nothing done gets no results');
+  ok((await call('d', `/campaigns/${c5.id}`)).campaign.my_submitted === 0, 'campaign reports my_submitted for the nav');
+  const sa = await call('a', `/campaigns/${c5.id}/stats`);
+  ok(sa.scope.visible === 1 && sa.summary.papers === 1 && sa.paper_list.length === 1 && sa.paper_list[0].id === ps[0].id, 'annotator sees only the paper they marked as done');
+  ok(sa.summary.submitted === 2 && sa.conflicts.length === 1, 'and the full results on that paper, colleagues included');
+  const sa2 = await call('a', `/campaigns/${c5.id}/stats?papers=${ps[1].id},${ps[2].id}`);
+  ok(sa2.summary.papers === 0 && sa2.summary.submitted === 0, 'asking for papers not done yet returns nothing about them');
+  const sb = await call('b', `/campaigns/${c5.id}/stats`);
+  ok(sb.scope.visible === 3 && sb.summary.submitted === 3, 'owner sees every paper');
+  const sb2 = await call('b', `/campaigns/${c5.id}/stats?papers=${ps[1].id}`);
+  ok(sb2.summary.papers === 1 && sb2.summary.submitted === 1 && sb2.paper_list.length === 3, 'paper filter restricts results; the picker still lists all visible papers');
+  const xa = await call('a', `/campaigns/${c5.id}/stats/export.xlsx?papers=${ps[0].id},${ps[1].id}`);
+  const XLSX = (await import('../server/node_modules/xlsx/xlsx.mjs'));
+  const rows = XLSX.utils.sheet_to_json(XLSX.read(Buffer.from(xa)).Sheets.annotations);
+  ok(rows.length === 2 && rows.every(r => r.title === 'P1'), `annotator export holds only visible papers (${rows.length} rows)`);
+
+  const pa1 = await call('a', `/campaigns/${c5.id}/papers/${ps[0].id}`);
+  ok(pa1.all_annotations.length === 2, "after marking done, the annotator sees colleagues' answers on that paper");
+  const pd1 = await call('d', `/campaigns/${c5.id}/papers/${ps[0].id}`);
+  ok(pd1.all_annotations.length === 0, "before marking done, colleagues' answers stay hidden");
+  await put('d', ps[0], 'Yes', 'draft');
+  ok((await call('d', `/campaigns/${c5.id}/papers/${ps[0].id}`)).all_annotations.length === 1, 'a draft is not enough');
+  await put('d', ps[0], 'Yes');
+  ok((await call('d', `/campaigns/${c5.id}/papers/${ps[0].id}`)).all_annotations.length === 3, 'once done, everyone done on that paper is visible');
+  ok((await call('a', `/campaigns/${c5.id}/papers/${ps[1].id}`)).all_annotations.every(x => x.user_id === pa1.my_annotation.user_id), 'on a paper still in draft, only your own answers');
+  console.log('RESULTS PASSED');
+}
+
+// ---- comments on criteria; cli fields sync (renames across a letter shift, option renames, yes/no to choice) ----
+{
+  const c6 = (await call('b', '/campaigns', { method: 'POST', body: { name: 'Sync me' } })).campaign;
+  const fA = (await call('b', `/campaigns/${c6.id}/fields`, { method: 'POST', body: { name: 'G1. Judge used', type: 'boolean', group_name: 'G : Ext' } })).field;
+  const fB = (await call('b', `/campaigns/${c6.id}/fields`, { method: 'POST', body: { name: 'F4. Vulnerable', type: 'multi', options: ['Mineurs', 'Aucun spécifié'], group_name: 'F : Ctx' } })).field;
+  const fd = new FormData(); fd.append('title', 'S1'); fd.append('pdf', new Blob([pdfBytes], { type: 'application/pdf' }), 'p.pdf');
+  const p6 = (await call('b', `/campaigns/${c6.id}/papers`, { method: 'POST', form: fd })).paper;
+  const long = 'x'.repeat(3000);
+  await call('b', `/campaigns/${c6.id}/papers/${p6.id}/annotation`, { method: 'PUT', body: { values: { [fA.id]: true, [fB.id]: ['Aucun spécifié'], [`${fB.id}:note`]: long }, status: 'submitted' } });
+  const saved = (await call('b', `/campaigns/${c6.id}/papers/${p6.id}`)).my_annotation.values;
+  ok(saved[`${fB.id}:note`].length === 2000, 'comments are kept and capped at 2000 characters');
+  const XLSX = (await import('../server/node_modules/xlsx/xlsx.mjs'));
+  const rows = XLSX.utils.sheet_to_json(XLSX.read(Buffer.from(await call('b', `/campaigns/${c6.id}/stats/export.xlsx`))).Sheets.annotations);
+  ok(rows[0].comments.startsWith('F4. Vulnerable: xxx'), 'export has a comments column');
+
+  const fsm = await import('node:fs'); const path = await import('node:path'); const { spawnSync } = await import('node:child_process');
+  const cb = { general_rules: ['Rule one.'], groups: [
+    { id: 'B', name: 'B : Ext', description: 'Ext group', criteria: [{ id: 'B1', name: 'B1. Judge used', previous_names: ['G1. Judge used'], type: 'single_choice', previous_type: 'yes_no', description: 'd', options: [{ value: 'Oui', from_bool: true, description: 'y' }, { value: 'Non', from_bool: false, description: 'n' }, { value: 'Pas de juge', description: 'none' }] }] },
+    { id: 'G', name: 'G : Ctx', criteria: [{ id: 'G4', name: 'G4. Vulnerable', previous_names: ['F4. Vulnerable'], type: 'multiple_choice', description: 'd', options: [{ value: 'Mineurs', description: 'm' }, { value: 'Aucun spécifié par les auteurs', previous_value: 'Aucun spécifié', description: 'a' }] }] }] };
+  const file = path.join(process.env.CONCORD_DATA_DIR, 'cb.json'); fsm.writeFileSync(file, JSON.stringify(cb));
+  const run = (...a) => spawnSync(process.execPath, ['--no-warnings', 'cli.js', ...a], { cwd: new URL('../server/', import.meta.url).pathname, env: { ...process.env, DATA_DIR: process.env.CONCORD_DATA_DIR }, encoding: 'utf8' });
+  const dry = run('fields', 'sync', String(c6.id), file, '--dry-run');
+  ok(/DRY RUN/.test(dry.stdout) && /Would migrate 2 answers/.test(dry.stdout), `dry run reports the migration (${dry.stdout.trim().split('\n').pop()})`);
+  ok((await call('b', `/campaigns/${c6.id}`)).fields[0].name === 'G1. Judge used', 'dry run writes nothing');
+  const real = run('fields', 'sync', String(c6.id), file);
+  ok(real.status === 0 && !/^!/m.test(real.stdout), 'sync applies without warnings');
+  const after = await call('b', `/campaigns/${c6.id}`);
+  ok(after.fields.map(f => f.name).join('|') === 'B1. Judge used|G4. Vulnerable' && after.fields[0].type === 'single', 'criteria renamed across the letter shift and retyped');
+  const v = (await call('b', `/campaigns/${c6.id}/papers/${p6.id}`)).my_annotation.values;
+  ok(v[fA.id] === 'Oui' && v[fB.id][0] === 'Aucun spécifié par les auteurs' && v[`${fB.id}:note`].length === 2000, 'answers migrated, comment kept');
+  ok(after.campaign.guidelines === '1. Rule one.' && after.campaign.group_help['B : Ext'] === 'Ext group', 'guidelines and section descriptions set');
+  ok(/Migrated 0 answers/.test(run('fields', 'sync', String(c6.id), file).stdout), 'a second sync changes nothing');
+  console.log('SYNC PASSED');
 }

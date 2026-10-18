@@ -1,6 +1,6 @@
 # Agreement statistics
 
-The *Agreement* page is visible to the campaign owner and counts **submitted** annotations only. Drafts are ignored. Everything is computed on the server from the raw answers at request time; there is no cached state.
+The *Results* page counts annotations **marked as done** only. The owner sees every paper; an annotator sees the papers they have marked as done themselves. *Choose papers* restricts everything on the page, and the export, to a selection. Drafts are ignored. Everything is computed on the server from the raw answers at request time; there is no cached state.
 
 ## By criterion type
 

@@ -7,7 +7,7 @@ Concord is meant to be exposed on the internet by a small research group behind 
 - Passwords are bcrypt-hashed (cost 11), minimum 8 characters. Sign-in takes the same time whether or not the account exists.
 - Sessions are httpOnly, SameSite=Lax cookies carrying a signed JWT (HS256, 30 days) with only the user id. The secret comes from `JWT_SECRET` or is generated once and stored in the data directory with mode 600.
 - Cookies are marked Secure when `APP_URL` is https (or `COOKIE_SECURE=true`), and HSTS is sent in that case.
-- Changing a password invalidates every session token issued before the change.
+- Changing a password (reset link or CLI) increments a per-account token version carried in every session, which revokes all older sessions immediately.
 - Registration can be limited to invitations with `OPEN_REGISTRATION=false`.
 
 ## Invitations and resets
@@ -32,7 +32,8 @@ Concord is meant to be exposed on the internet by a small research group behind 
 
 ## Authorisation
 
-- Every campaign route checks membership; owner-only routes (criteria, papers, stages, assignments, invitations, transfer, statistics, export) check ownership.
+- Every campaign route checks membership; owner-only routes (criteria, papers, stages, assignments, invitations, transfer, settings) check ownership.
+- Results, the export and colleagues' answers on a paper are limited for annotators to the papers they have marked as done themselves.
 - Annotation is only possible for assigned members (and the owner), and only once the paper has a PDF.
 - Ownership transfer requires the current owner and a target who is already a member.
 

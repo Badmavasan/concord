@@ -43,6 +43,8 @@
 - Answers are saved to the database automatically as they are given (and flushed when the page is left), so nothing is lost by navigating away. *Mark as done* is the explicit validation step: required criteria and option values are checked, the annotation counts in statistics, and the paper advances on the board. A done annotation is shown read-only with *Edit answers*, *Save changes* and *Cancel*.
 - Owner view of all annotators' answers on a paper.
 - Annotation locked while a paper has no PDF.
+- An optional comment under every criterion, to justify an answer or point to the evidence. Comments are saved with the answers, shown with colleagues' answers and in the disagreement list, and exported in a *comments* column.
+- *Mark as done* first lists the criteria still unanswered in a pop-up, each linking to its question, with *Keep annotating* or *Mark as done anyway*. Validation problems (an *Autre* without its text, for instance) are explained in a pop-up too; the answers are saved either way.
 
 ## Board
 
@@ -51,14 +53,18 @@
 - Automatic moves: first draft to *In progress*, all submitted to *Reviewed*.
 - Cards show assignees with their status, submission count, and a missing-PDF badge. Filter to your own papers.
 
-## Agreement statistics
+## Results and agreement statistics
+
+- Open to the owner, for every paper, and to every annotator, for exactly the papers they have marked as done. Nobody sees colleagues' answers on a paper before giving their own, so the agreement figures stay meaningful.
+- The same rule applies inside a paper: once your annotation is done, colleagues' submitted answers and comments appear under the form.
+- Global results across all visible papers, or results for a chosen set: a paper picker with search, quick filters (2+ annotators, done by me, selected) and a stage filter. The choice is remembered per campaign, applies to the export, and the owner can jump to it from a selection on the Papers page.
 
 - Per criterion: distribution, pairwise raw agreement and Cohen's kappa, Fleiss' kappa across all raters, Landis and Koch interpretation.
 - Multiple choice: per-option kappa treating each option as yes/no, plus Jaccard overlap per pair.
 - Numbers: mean, SD, range, pairwise exact agreement, mean absolute difference, Pearson correlation.
 - Free text: fill count and average length.
-- Disagreement list per paper and criterion.
-- Excel export of all submitted annotations.
+- Disagreement list per paper and criterion, with comments.
+- Excel export of the visible, or selected, submitted annotations.
 
 ## Administration
 

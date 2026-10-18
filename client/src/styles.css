@@ -240,3 +240,22 @@ body:has(.reader) { overflow: hidden; }
 .guidelines div { padding: 0 12px 12px; white-space: pre-line; line-height: 1.5; color: var(--ink-2); }
 
 .section-help { margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); background: var(--mark-soft); border-left: 3px solid var(--mark); padding: 8px 12px; border-radius: 0 var(--r) var(--r) 0; }
+
+/* results: paper scope and picker */
+.picker-list { max-height: 52vh; overflow-y: auto; border: 1px solid var(--rule); border-radius: var(--r); }
+.picker-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; padding: 9px 12px; border-bottom: 1px solid var(--rule); cursor: pointer; }
+.picker-row:last-child { border-bottom: 0; }
+.picker-row:hover { background: var(--surface-2); }
+.picker-row.on { background: var(--mark-soft); }
+.picker-row input { margin-top: 3px; }
+.picker-row .title { font-family: var(--serif); font-weight: 500; font-size: 15px; line-height: 1.3; display: block; }
+.picker-row .sub { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+/* per-criterion comment and the mark-as-done popup */
+.note-toggle { margin-top: 6px; padding-left: 0; color: var(--muted); }
+.note-toggle:hover { color: var(--ink); background: transparent; text-decoration: underline; }
+.note-box { margin-top: 8px; font-size: 13.5px; min-height: 52px; background: var(--surface-2); }
+.note-read { margin-top: 8px; font-size: 13.5px; padding: 6px 10px; border-left: 3px solid var(--rule-strong); background: var(--surface-2); white-space: pre-line; }
+.missing-row { display: block; width: 100%; text-align: left; font: inherit; font-size: 14px; padding: 8px 12px; border: 0; border-bottom: 1px solid var(--rule); background: var(--surface); cursor: pointer; color: var(--ink); }
+.missing-row:last-child { border-bottom: 0; }
+.missing-row:hover { background: var(--mark-soft); }

@@ -67,14 +67,14 @@ All routes are under `/api`, speak JSON, and use the session cookie set at sign-
 | POST | `/campaigns/:id/papers/:pid/move` | member: `{ stage_id, position }` |
 | PUT | `/campaigns/:id/papers/:pid/annotation` | assignee or owner: `{ values, status: "draft" \| "submitted" }` |
 
-Annotation `values` are keyed by criterion id. Two companion keys exist: `"<id>:other"` holds the text of an option that takes one, and `"<id>:checks"` holds the labels of ticked checkboxes.
+Annotation `values` are keyed by criterion id. Two companion keys exist: `"<id>:other"` holds the text of an option that takes one, `"<id>:checks"` holds the labels of ticked checkboxes, and `"<id>:note"` the optional comment (2000 characters at most).
 
 ## Statistics
 
 | Method | Path | Who |
 |---|---|---|
-| GET | `/campaigns/:id/stats` | owner: summary, per-criterion statistics, conflicts |
-| GET | `/campaigns/:id/stats/export.xlsx` | owner |
+| GET | `/campaigns/:id/stats?papers=1,2,3` | owner: every paper; annotator: papers they marked as done (403 before the first). Returns `scope`, `summary`, per-criterion statistics, `conflicts`, and `paper_list` for the picker. `papers` restricts to a selection. |
+| GET | `/campaigns/:id/stats/export.xlsx?papers=…` | same scope and filter |
 
 ## Other
 

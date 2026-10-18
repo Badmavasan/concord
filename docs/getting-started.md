@@ -48,6 +48,6 @@ The owner can also open any paper and see everyone's answers side by side.
 
 The *Board* shows every paper as a card in a stage. Default stages are *To review*, *In progress*, *Reviewed*, *Conflict* and *Done*; the owner can add, rename, reorder and delete stages. Papers move to *In progress* when someone saves a first draft and to *Reviewed* when every assignee has submitted. Drag cards to move them by hand, for instance into *Conflict* while you resolve a disagreement.
 
-## 9. Read the agreement
+## 9. Read the results
 
-The *Agreement* page (owner only) shows, for every criterion, the distribution of answers and the agreement between annotators: Cohen's kappa for each pair, Fleiss' kappa across everyone, and interpretation. Below is the list of every paper where annotators disagreed, with each person's answer. *Export to Excel* downloads every submitted annotation as one sheet, one row per paper and annotator. See [statistics](statistics.md) for what is computed.
+The *Results* page shows, to the owner for every paper and to each annotator for the papers they have marked as done, for every criterion, the distribution of answers and the agreement between annotators: Cohen's kappa for each pair, Fleiss' kappa across everyone, and interpretation. Below is the list of every paper where annotators disagreed, with each person's answer. *Choose papers* narrows everything to a selection of papers, for instance one track or the papers with two annotators. *Export* downloads the annotations in view as one sheet, one row per paper and annotator, with a column of comments. See [statistics](statistics.md) for what is computed.

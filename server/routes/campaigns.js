@@ -41,7 +41,8 @@ r.get('/:id', requireMember, (req, res) => {
   const fields = q.all('SELECT * FROM fields WHERE campaign_id = ? ORDER BY position, id', req.campaign.id).map(f => ({ ...f, options: JSON.parse(f.options || '[]'), option_help: JSON.parse(f.option_help || '{}'), checks: JSON.parse(f.checks || '[]'), text_options: JSON.parse(f.text_options || '[]'), required: !!f.required }));
   const stages = q.all('SELECT * FROM stages WHERE campaign_id = ? ORDER BY position, id', req.campaign.id);
   let group_help = {}; try { group_help = JSON.parse(req.campaign.group_help || '{}'); } catch {}
-  res.json({ campaign: { ...req.campaign, group_help, role: req.role }, members, fields, stages });
+  const my_submitted = q.get(`SELECT COUNT(*) AS n FROM annotations a JOIN papers p ON p.id = a.paper_id WHERE p.campaign_id = ? AND a.user_id = ? AND a.status = 'submitted'`, req.campaign.id, req.user.id).n;
+  res.json({ campaign: { ...req.campaign, group_help, role: req.role, my_submitted }, members, fields, stages });
 });
 
 r.patch('/:id', requireMember, requireOwner, (req, res) => {

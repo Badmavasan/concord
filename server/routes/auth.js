@@ -102,8 +102,8 @@ r.post('/reset/:token', authLimiter, (req, res) => {
   if (!row) return res.status(404).json({ error: 'This link is not valid or has expired. Request a new one.' });
   const password = String(req.body.password || '');
   const pp = passwordProblem(password); if (pp) return res.status(400).json({ error: pp });
-  // password_changed_at invalidates every session token issued before now.
-  q.run('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?', bcrypt.hashSync(password, 11), Date.now(), row.user_id);
+  // Bumping token_version revokes every session issued before this change; the new cookie below carries the new version.
+  q.run('UPDATE users SET password_hash = ?, password_changed_at = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?', bcrypt.hashSync(password, 11), Date.now(), row.user_id);
   spendReset(req.params.token);
   const user = q.get('SELECT id, email, name FROM users WHERE id = ?', row.user_id);
   res.cookie('token', signToken(user), cookieOpts).json({ user });

@@ -4,8 +4,10 @@ import { loadSecret } from './security.js';
 
 export const JWT_SECRET = loadSecret();
 
+// Each token carries the account's token_version; bumping the version (on a password change) revokes every older session.
 export function signToken(user) {
-  return jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d', algorithm: 'HS256' });
+  const v = q.get('SELECT token_version FROM users WHERE id = ?', user.id)?.token_version || 0;
+  return jwt.sign({ id: user.id, v }, JWT_SECRET, { expiresIn: '30d', algorithm: 'HS256' });
 }
 
 export function requireAuth(req, res, next) {
@@ -13,10 +15,10 @@ export function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   try {
     const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-    const user = q.get('SELECT id, email, name, password_changed_at FROM users WHERE id = ?', payload.id);
+    const user = q.get('SELECT id, email, name, token_version FROM users WHERE id = ?', payload.id);
     if (!user) return res.status(401).json({ error: 'User not found' });
-    if (user.password_changed_at && payload.iat * 1000 < user.password_changed_at - 1000) return res.status(401).json({ error: 'Session expired, sign in again' });
-    delete user.password_changed_at;
+    if ((payload.v || 0) !== (user.token_version || 0)) return res.status(401).json({ error: 'Session expired, sign in again' });
+    delete user.token_version;
     req.user = user;
     next();
   } catch {

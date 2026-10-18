@@ -19,6 +19,7 @@ export default function Campaign() {
   if (!data) return <div className="page muted">Loading</div>;
   const { campaign } = data;
   const owner = campaign.role === 'owner';
+  const canResults = owner || campaign.my_submitted > 0;
   const ctx = { ...data, owner, reload };
 
   return (
@@ -31,7 +32,7 @@ export default function Campaign() {
           <NavLink to="board">Board</NavLink>
           {owner && <NavLink to="fields">Criteria <span className="count">{data.fields.length}</span></NavLink>}
           <NavLink to="members">Team <span className="count">{data.members.length}</span></NavLink>
-          {owner && <NavLink to="stats">Agreement</NavLink>}
+          {canResults && <NavLink to="stats">Results</NavLink>}
           {owner && <NavLink to="settings">Settings</NavLink>}
         </nav>
         <div className="role">{owner ? 'You own this campaign.' : 'You annotate in this campaign.'}</div>
@@ -43,7 +44,7 @@ export default function Campaign() {
           <Route path="board" element={<KanbanTab {...ctx} />} />
           <Route path="fields" element={owner ? <FieldsTab {...ctx} /> : <Navigate to="../papers" />} />
           <Route path="members" element={<MembersTab {...ctx} />} />
-          <Route path="stats" element={owner ? <StatsTab {...ctx} /> : <Navigate to="../papers" />} />
+          <Route path="stats" element={canResults ? <StatsTab {...ctx} /> : <Navigate to="../papers" />} />
           <Route path="settings" element={owner ? <SettingsTab {...ctx} /> : <Navigate to="../papers" />} />
         </Routes>
       </main>

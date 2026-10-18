@@ -95,7 +95,11 @@ r.get('/:paperId', requireMember, (req, res) => {
   const annotations = q.all('SELECT a.*, u.name AS user_name FROM annotations a JOIN users u ON u.id = a.user_id WHERE paper_id = ?', p.id)
     .map(a => ({ ...a, values: JSON.parse(a.values_json || '{}') }));
   const mine = annotations.find(a => a.user_id === req.user.id);
-  res.json({ paper: decorate(p, req.user.id), my_annotation: mine || null, all_annotations: req.role === 'owner' ? annotations : annotations.filter(a => a.user_id === req.user.id) });
+  // The owner sees everyone's answers. An annotator sees colleagues' submitted answers only after marking their own as done.
+  const visible = req.role === 'owner' ? annotations
+    : mine?.status === 'submitted' ? annotations.filter(a => a.user_id === req.user.id || a.status === 'submitted')
+    : annotations.filter(a => a.user_id === req.user.id);
+  res.json({ paper: decorate(p, req.user.id), my_annotation: mine || null, all_annotations: visible });
 });
 
 r.patch('/:paperId', requireMember, requireOwner, (req, res) => {
@@ -225,7 +229,7 @@ r.put('/:paperId/annotation', requireMember, (req, res) => {
   if (!p.pdf_path) return res.status(400).json({ error: 'This paper has no PDF yet; annotation is blocked until one is uploaded' });
   const values = req.body.values && typeof req.body.values === 'object' && !Array.isArray(req.body.values) ? req.body.values : {};
   if (JSON.stringify(values).length > 200000) return res.status(400).json({ error: 'Annotation is too large' });
-  for (const k of Object.keys(values)) if (k.endsWith(':other')) values[k] = str(values[k], 500);
+  for (const k of Object.keys(values)) { if (k.endsWith(':other')) values[k] = str(values[k], 500); if (k.endsWith(':note')) values[k] = str(values[k], 2000); }
   const status = req.body.status === 'submitted' ? 'submitted' : 'draft';
   if (status === 'submitted') {
     const fields = q.all('SELECT * FROM fields WHERE campaign_id = ?', req.campaign.id);

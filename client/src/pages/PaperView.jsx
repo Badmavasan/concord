@@ -5,12 +5,16 @@ const MIN_W = 320, DEFAULT_W = 440;
 export const isOtherOption = v => /^(autres?|others?)\s*(:.*)?$/i.test(String(v).trim());
 export const otherKey = id => `${id}:other`;
 export const checkKey = id => `${id}:checks`;
+export const noteKey = id => `${id}:note`;
+// A criterion counts as answered when it has a value or a ticked checkbox.
+const answered = (f, values) => { const v = values[f.id]; const ck = values[checkKey(f.id)]; return (Array.isArray(ck) && ck.length > 0) || !(v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)); };
 const readWidth = () => { try { const v = Number(localStorage.getItem('concord.readerWidth')); return v >= MIN_W ? v : DEFAULT_W; } catch { return DEFAULT_W; } };
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../auth.jsx';
 import { PdfUploadModal, AssignModal, EditPaperModal } from './tabs/PapersTab.jsx';
 import Avatar, { Assignees } from '../components/Avatar.jsx';
+import Modal from '../components/Modal.jsx';
 
 export default function PaperView() {
   const { id, paperId } = useParams();
@@ -22,6 +26,7 @@ export default function PaperView() {
   const [msg, setMsg] = useState(null);
   const [modal, setModal] = useState(null);
   const [showOthers, setShowOthers] = useState(false);
+  const [confirm, setConfirm] = useState(null); // null | { unanswered: [...] } | { errors: [...] } shown before/after Mark as done
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState(null); // null | 'saving' | 'saved' | 'error'
   const [editing, setEditing] = useState(false); // editing a done annotation
@@ -77,9 +82,25 @@ export default function PaperView() {
     try {
       const d = await api(`${base}/papers/${paperId}/annotation`, { method: 'PUT', body: { values: latest.current.values, status } });
       setData(x => ({ ...x, my_annotation: d.annotation, paper: d.paper })); setDirty(false); setSaveState('saved');
-      if (status === 'submitted') { setEditing(false); setMsg({ ok: true, text: editing ? 'Changes saved' : 'Marked as done' }); }
-    } catch (e) { setSaveState('error'); if (!quiet) { setMsg({ ok: false, text: e.message }); setFieldErrors(e.data?.field_errors || {}); } }
+      if (status === 'submitted') { setEditing(false); setMsg({ ok: true, text: editing ? 'Changes saved' : 'Marked as done' }); api(`${base}/papers/${paperId}`).then(p => setData(x => ({ ...x, all_annotations: p.all_annotations }))).catch(() => {}); }
+    } catch (e) {
+      setSaveState('error');
+      if (!quiet) {
+        const fe = e.data?.field_errors || {}; setFieldErrors(fe);
+        if (Object.keys(fe).length) { setMsg(null); return camp.fields.map((f, i) => ({ f, n: i + 1, msg: fe[f.id] })).filter(x => x.msg); }
+        setMsg({ ok: false, text: e.message });
+      }
+      return false;
+    }
+    return true;
   };
+  // Mark as done: warn first about unanswered criteria (answers are already saved), and explain any validation problem in a popup.
+  const requestDone = (force = false) => {
+    const unanswered = camp.fields.map((f, i) => ({ f, n: i + 1 })).filter(({ f }) => !answered(f, values));
+    if (unanswered.length && !force) return setConfirm({ unanswered });
+    setConfirm(null); save('submitted').then(r => { if (Array.isArray(r) && r.length) setConfirm({ errors: r }); });
+  };
+  const goTo = id => { setConfirm(null); setTimeout(() => document.getElementById('q-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); };
   const cancelEdit = () => { setValues(my_annotation?.values || {}); setDirty(false); setEditing(false); setMsg(null); setFieldErrors({}); };
   const setVal = (fid, v) => { setValues(vs => ({ ...vs, [fid]: v })); setDirty(true); };
 
@@ -110,23 +131,23 @@ export default function PaperView() {
             : !paper.has_pdf ? <div className="note red" style={{ marginTop: 12 }}>Answers are locked until the PDF is attached.</div>
             : camp.fields.length === 0 ? <div className="muted" style={{ padding: '12px 0' }}>No criteria have been defined for this campaign yet.</div>
             : (
-              <form id="annotation" className={submitted && !editing ? 'readonly' : ''} onSubmit={e => { e.preventDefault(); save('submitted'); }}>
+              <form id="annotation" className={submitted && !editing ? 'readonly' : ''} onSubmit={e => { e.preventDefault(); requestDone(); }}>
                 {submitted && !editing && <div className="note" style={{ marginTop: 12 }}>Marked as done{my_annotation?.updated_at ? ` on ${new Date(my_annotation.updated_at + 'Z').toLocaleString()}` : ''}. Use Edit to change your answers.</div>}
                 {camp.campaign.guidelines && <details className="guidelines" open={!my_annotation}><summary>Annotation guidelines</summary><div>{camp.campaign.guidelines}</div></details>}
                 {camp.fields.some(f => f.option_help && Object.keys(f.option_help).length) && <label className="opt small muted" style={{ padding: '10px 0 0' }}><input type="checkbox" checked={guide} onChange={e => setGuide(e.target.checked)} /> Show coding rules under each option</label>}
                 {camp.fields.map((f, i) => <Fragment key={f.id}>
                   {f.group_name && (i === 0 || camp.fields[i - 1].group_name !== f.group_name) && <><h3 className="section-head">{f.group_name}</h3>{camp.campaign.group_help?.[f.group_name] && <p className="section-help">{camp.campaign.group_help[f.group_name]}</p>}</>}
-                  <Question f={f} n={i + 1} value={values[f.id]} other={values[otherKey(f.id)]} ticked={values[checkKey(f.id)]} onTick={l => setVal(checkKey(f.id), l)} error={fieldErrors[f.id]} guide={guide} disabled={submitted && !editing} onChange={v => setVal(f.id, v)} onOther={t => setVal(otherKey(f.id), t)} />
+                  <Question f={f} n={i + 1} value={values[f.id]} other={values[otherKey(f.id)]} note={values[noteKey(f.id)]} onNote={t => setVal(noteKey(f.id), t)} ticked={values[checkKey(f.id)]} onTick={l => setVal(checkKey(f.id), l)} error={fieldErrors[f.id]} guide={guide} disabled={submitted && !editing} onChange={v => setVal(f.id, v)} onOther={t => setVal(otherKey(f.id), t)} />
                 </Fragment>)}
               </form>
             )}
-          {owner && others.length > 0 && (
+          {others.length > 0 && ( /* owner: always; annotator: only after marking their own as done, decided by the server */
             <div style={{ marginTop: 16 }}>
               <button className="btn sm" onClick={() => setShowOthers(s => !s)}>{showOthers ? 'Hide' : 'Show'} other people's answers ({others.length})</button>
               {showOthers && others.map(a => (
                 <div key={a.id} className="panel" style={{ marginTop: 10, padding: 14 }}>
                   <div className="person" style={{ marginBottom: 6 }}><Avatar name={a.user_name} status={a.status} /> <strong>{a.user_name}</strong> <span className={'tag ' + (a.status === 'submitted' ? 'ok' : 'warn')}>{a.status}</span></div>
-                  <table className="small"><tbody>{camp.fields.map(f => <tr key={f.id}><td className="muted" style={{ width: 150, padding: '4px 0', border: 0 }}>{f.name}</td><td style={{ padding: '4px 0', border: 0 }}>{(a.values[checkKey(f.id)] || []).length ? `[${a.values[checkKey(f.id)].join(', ')}] ${a.values[f.id] || ''}` : fmtVal(a.values[f.id])}{a.values[otherKey(f.id)] ? ` (${a.values[otherKey(f.id)]})` : ''}</td></tr>)}</tbody></table>
+                  <table className="small"><tbody>{camp.fields.map(f => <tr key={f.id}><td className="muted" style={{ width: 150, padding: '4px 0', border: 0 }}>{f.name}</td><td style={{ padding: '4px 0', border: 0 }}>{(a.values[checkKey(f.id)] || []).length ? `[${a.values[checkKey(f.id)].join(', ')}] ${a.values[f.id] || ''}` : fmtVal(a.values[f.id])}{a.values[noteKey(f.id)] ? <div className="muted" style={{ fontStyle: 'italic' }}>{a.values[noteKey(f.id)]}</div> : null}{a.values[otherKey(f.id)] ? ` (${a.values[otherKey(f.id)]})` : ''}</td></tr>)}</tbody></table>
                 </div>
               ))}
             </div>
@@ -150,6 +171,24 @@ export default function PaperView() {
           </div>
         )}
       </aside>
+      {confirm?.unanswered && (
+        <Modal title="Some criteria are not answered" onClose={() => setConfirm(null)}>
+          <div className="stack">
+            <div className="small">Your answers are saved. {confirm.unanswered.length === 1 ? 'One criterion has' : `${confirm.unanswered.length} criteria have`} no answer yet. Conditional questions that do not apply can stay empty.</div>
+            <div className="picker-list" style={{ maxHeight: '40vh' }}>{confirm.unanswered.map(({ f, n }) => <button key={f.id} type="button" className="missing-row" onClick={() => goTo(f.id)}><span className="muted">{n}.</span> {f.name}</button>)}</div>
+            <div className="actions"><button className="btn" onClick={() => setConfirm(null)}>Keep annotating</button><button className="btn mark" onClick={() => requestDone(true)}>Mark as done anyway</button></div>
+          </div>
+        </Modal>
+      )}
+      {confirm?.errors && (
+        <Modal title="This annotation cannot be marked as done yet" onClose={() => setConfirm(null)}>
+          <div className="stack">
+            <div className="small">Your answers are saved and the paper stays in progress. Fix {confirm.errors.length === 1 ? 'this point' : 'these points'}, then mark it as done again.</div>
+            <div className="picker-list" style={{ maxHeight: '40vh' }}>{confirm.errors.map(({ f, n, msg }) => <button key={f.id} type="button" className="missing-row" onClick={() => goTo(f.id)}><span className="muted">{n}.</span> {f.name}<span className="error small" style={{ display: 'block' }}>{msg}</span></button>)}</div>
+            <div className="actions"><button className="btn primary" onClick={() => goTo(confirm.errors[0].f.id)}>Go to the first one</button></div>
+          </div>
+        </Modal>
+      )}
       {modal === 'edit' && <EditPaperModal base={`${base}/papers`} paper={paper} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
       {modal === 'pdf' && <PdfUploadModal base={`${base}/papers`} paper={paper} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
       {modal === 'assign' && <AssignModal base={`${base}/papers`} members={camp.members} papers={[paper]} onClose={() => setModal(null)} onDone={() => { setModal(null); load(); }} />}
@@ -159,7 +198,9 @@ export default function PaperView() {
 
 const fmtVal = v => v == null || v === '' ? '—' : Array.isArray(v) ? v.join(', ') : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v);
 
-function Question({ f, n, value, other, ticked, onTick, error, guide, disabled, onChange, onOther }) {
+function Question({ f, n, value, other, note, onNote, ticked, onTick, error, guide, disabled, onChange, onOther }) {
+  const [noteOpen, setNoteOpen] = useState(false);
+  const hasNote = !!String(note || '').trim();
   const name = 'f' + f.id;
   const takesText = o => isOtherOption(o) || (f.text_options || []).includes(o);
   const firstText = (Array.isArray(value) ? f.options.filter(o => value.includes(o)) : [value]).find(takesText); // one text box per question
@@ -177,11 +218,16 @@ function Question({ f, n, value, other, ticked, onTick, error, guide, disabled, 
   else if (f.type === 'multi') input = <div className="choices">{f.options.map(o => <label key={o} className={'opt' + (help(o) ? ' with-help' : '')}><input type="checkbox" checked={(value || []).includes(o)} onChange={e => onChange(e.target.checked ? [...(value || []), o] : (value || []).filter(x => x !== o))} disabled={disabled} /><span>{o}{help(o)}{otherBox(o)}</span></label>)}</div>;
   else if (f.type === 'scale') { const pts = []; for (let i = f.options.min; i <= f.options.max; i++) pts.push(i); input = <div className="scale">{pts.map(i => <label key={i}><input type="radio" name={name} checked={Number(value) === i} onChange={() => onChange(i)} disabled={disabled} />{i}</label>)}</div>; }
   return (
-    <div className={'question' + (error ? ' invalid' : '')}>
+    <div className={'question' + (error ? ' invalid' : '')} id={'q-' + f.id}>
       <div className="q"><span className="muted" style={{ fontWeight: 400, fontVariantNumeric: 'tabular-nums' }}>{n}.</span><span>{f.name}{f.required && <span className="req"> *</span>}</span></div>
       {f.description && <div className="help" style={{ whiteSpace: 'pre-line' }}>{f.description}</div>}
       <div className="answer">{input}</div>
       {error && <div className="error small" style={{ marginTop: 4 }}>{error}</div>}
+      {disabled
+        ? (hasNote && <div className="note-read"><span className="muted">Comment</span> {note}</div>)
+        : (noteOpen || hasNote)
+          ? <textarea className="note-box" rows={2} maxLength={2000} value={note || ''} onChange={e => onNote(e.target.value)} placeholder="Comment or justification, optional: why this answer, what was ambiguous, where in the paper" aria-label={`Comment on ${f.name}`} autoFocus={noteOpen && !hasNote} />
+          : <button type="button" className="btn quiet sm note-toggle" onClick={() => setNoteOpen(true)}>Add a comment</button>}
     </div>
   );
 }

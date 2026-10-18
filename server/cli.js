@@ -70,8 +70,8 @@ const cmds = {
   'user password': ([email, pw]) => {
     if (!email || !pw) die('usage: user password <email> <newPassword>');
     const u = findUser(email);
-    q.run('UPDATE users SET password_hash = ? WHERE id = ?', bcrypt.hashSync(pw, 10), u.id);
-    console.log('Password updated for', u.email);
+    q.run('UPDATE users SET password_hash = ?, token_version = COALESCE(token_version, 0) + 1 WHERE id = ?', bcrypt.hashSync(pw, 11), u.id);
+    console.log('Password updated for', u.email, '(existing sessions signed out)');
   },
   'campaign create': ([name]) => {
     if (!name || !flags.owner) die('usage: campaign create "<name>" --owner <email> [--description ".."]');
@@ -120,7 +120,8 @@ const cmds = {
         const options = choice ? cr.options.map(o => o.value) : [];
         const text_options = JSON.stringify(choice ? cr.options.filter(o => o.allows_text).map(o => o.value) : []);
         const option_help = choice ? Object.fromEntries(cr.options.filter(o => o.description).map(o => [o.value, o.description])) : {};
-        let f = q.get('SELECT * FROM fields WHERE campaign_id = ? AND name = ?', c.id, cr.name) || (cr.previous_name && q.get('SELECT * FROM fields WHERE campaign_id = ? AND name = ?', c.id, cr.previous_name));
+        let f = q.get('SELECT * FROM fields WHERE campaign_id = ? AND name = ?', c.id, cr.name);
+        for (const pn of (cr.previous_names || (cr.previous_name ? [cr.previous_name] : []))) if (!f) f = q.get('SELECT * FROM fields WHERE campaign_id = ? AND name = ?', c.id, pn);
         if (!f) {
           const nf = normalizeField({ name: cr.name, type, options, option_help, required: !!cr.required, description: cr.description, group_name: g.name, checks: cr.checkboxes, text_options: JSON.parse(text_options) });
           q.run('INSERT INTO fields (campaign_id, name, description, type, options, required, position, group_name, option_help, checks, text_options) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', c.id, nf.name, nf.description, nf.type, nf.options, nf.required, pos++, nf.group_name, nf.option_help, nf.checks, nf.text_options);
@@ -142,6 +143,16 @@ const cmds = {
           log.push(`~ retyped  ${cr.id} "${f.name}": free text -> ${cr.type} (${options.length} options)`);
           f = { ...f, type };
           q.run('UPDATE fields SET type = ? WHERE id = ?', type, f.id);
+        }
+        if (f.type === 'boolean' && type === 'single' && cr.previous_type === 'yes_no') {
+          // yes/no becomes a choice: true and false map to the options marked from_bool
+          const yes = cr.options.find(o => o.from_bool === true)?.value, no = cr.options.find(o => o.from_bool === false)?.value;
+          for (const a of q.all('SELECT a.id, a.values_json FROM annotations a JOIN papers p ON p.id = a.paper_id WHERE p.campaign_id = ?', c.id)) {
+            const vals = JSON.parse(a.values_json || '{}'); const v = vals[f.id]; if (typeof v !== 'boolean') continue;
+            vals[f.id] = v ? yes : no; q.run('UPDATE annotations SET values_json = ? WHERE id = ?', JSON.stringify(vals), a.id); migrated++;
+          }
+          log.push(`~ retyped  ${cr.id} "${f.name}": yes/no -> ${cr.options.map(o => o.value).join(' / ')}`);
+          f = { ...f, type }; q.run('UPDATE fields SET type = ? WHERE id = ?', type, f.id);
         }
         if (f.type !== type) { log.push(`! skipped  ${cr.id} ${cr.name}: type is ${f.type} in the campaign, ${type} in the file (delete it first to replace it)`); q.run('UPDATE fields SET position = ? WHERE id = ?', pos++, f.id); continue; }
         if (f.name !== cr.name) log.push(`~ renamed  ${cr.id} "${f.name}" -> "${cr.name}"`);
@@ -176,7 +187,7 @@ const cmds = {
         q.run('UPDATE fields SET name = ?, description = ?, group_name = ?, options = ?, option_help = ?, checks = ?, text_options = ?, position = ? WHERE id = ?', cr.name, cr.description || '', g.name, JSON.stringify(options), JSON.stringify(option_help), checks, text_options, pos++, f.id);
       }
       // criteria in the campaign but not in the file stay, after the others
-      const names = new Set(cb.groups.flatMap(g => g.criteria.map(x => x.name))); const dropped = new Set((cb.removed || []).map(r => r.name));
+      const names = new Set(cb.groups.flatMap(g => g.criteria.flatMap(x => [x.name, ...(x.previous_names || [])]))); const dropped = new Set((cb.removed || []).map(r => r.name));
       for (const f of q.all('SELECT id, name FROM fields WHERE campaign_id = ? ORDER BY position, id', c.id)) if (!names.has(f.name) && !dropped.has(f.name)) { q.run('UPDATE fields SET position = ? WHERE id = ?', pos++, f.id); log.push(`? kept     "${f.name}" is not in the file`); }
       for (const r of cb.removed || []) {
         const f = q.get('SELECT id FROM fields WHERE campaign_id = ? AND name = ?', c.id, r.name); if (!f) continue;

@@ -15,5 +15,5 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 let up = false;
 for (let i = 0; i < 50 && !up; i++) { await sleep(200); try { up = (await fetch(`http://localhost:${port}/api/health`)).ok; } catch {} }
 if (!up) { server.kill(); console.error(fs.readFileSync(log, 'utf8')); process.exit(1); }
-const test = spawn(process.execPath, [path.join(root, 'tests', 'e2e.mjs')], { env: { ...process.env, CONCORD_URL: `http://localhost:${port}`, LOG: log }, stdio: 'inherit' });
+const test = spawn(process.execPath, [path.join(root, 'tests', 'e2e.mjs')], { env: { ...process.env, CONCORD_URL: `http://localhost:${port}`, LOG: log, CONCORD_DATA_DIR: dataDir }, stdio: 'inherit' });
 test.on('exit', code => { server.kill(); fs.rmSync(dataDir, { recursive: true, force: true }); process.exit(code ?? 1); });

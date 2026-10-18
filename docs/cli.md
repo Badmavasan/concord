@@ -37,10 +37,11 @@ mail test [address]                             check SMTP settings; with an add
 
 | In the JSON | Effect on the campaign |
 |---|---|
-| `previous_name` on a question | the question is renamed |
+| `previous_name` / `previous_names` on a question | the question is renamed (every earlier name is tried, which covers renumbered groups) |
 | `previous_value` on an option | the option is renamed and answers follow; two options sharing a `previous_value` split one option into two, and answers get both |
 | `removed_options` with `moved_to` | the option is dropped and its answers move to the named option of another question |
 | `previous_type: "free_text"` with `match` keywords on options | the question becomes a list; earlier texts are converted by keyword, and what is not recognised goes under the *Autre* option with its text |
+| `previous_type: "yes_no"` with `from_bool` on options | a yes/no question becomes a choice; earlier true and false answers become the marked options |
 | `removed` | the question is deleted (the number of answers no longer shown is reported) |
 | a question absent from the campaign | it is added at its place |
 | `allows_text`, `checkboxes` | text boxes on options and checkboxes under text answers |
